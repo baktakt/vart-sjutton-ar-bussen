@@ -9,7 +9,9 @@
     "test-static": "node scripts/test-static.js",
     "test-tripupdates": "node scripts/test-tripupdates.js",
     "test-vehicles": "node scripts/test-vehicles.js",
-    "test-vasttrafik": "node scripts/test-vasttrafik-api.js"
+    "test-vasttrafik": "node scripts/test-vasttrafik-api.js",
+    "test-situations": "node scripts/test-traffic-situations.js",
+    "test-tripdetails": "node scripts/test-trip-details.js"
   },
   "dependencies": {
     "adm-zip": "^0.5.16",

@@ -11,6 +11,8 @@ const ALLOWED = {
   tripupdates: 'test-tripupdates.js',
   vehicles:    'test-vehicles.js',
   vasttrafik:  'test-vasttrafik-api.js',
+  situations:  'test-traffic-situations.js',
+  tripdetails: 'test-trip-details.js',
 };
 
 export default function handler(req, res) {

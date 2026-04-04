@@ -8,10 +8,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT ?? 3000;
 
 const SCRIPTS = {
-  static: 'scripts/test-static.js',
-  tripupdates: 'scripts/test-tripupdates.js',
-  vasttrafik: 'scripts/test-vasttrafik-api.js',
-  vehicles: 'scripts/test-vehicles.js',
+  static:       'scripts/test-static.js',
+  tripupdates:  'scripts/test-tripupdates.js',
+  vehicles:     'scripts/test-vehicles.js',
+  vasttrafik:   'scripts/test-vasttrafik-api.js',
+  situations:   'scripts/test-traffic-situations.js',
+  tripdetails:  'scripts/test-trip-details.js',
 };
 
 const MIME = {
