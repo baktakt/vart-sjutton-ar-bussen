@@ -7,7 +7,8 @@
     "ui": "node server.js",
     "test-static": "node scripts/test-static.js",
     "test-tripupdates": "node scripts/test-tripupdates.js",
-    "test-vehicles": "node scripts/test-vehicles.js"
+    "test-vehicles": "node scripts/test-vehicles.js",
+    "test-vasttrafik": "node scripts/test-vasttrafik-api.js"
   },
   "dependencies": {
     "adm-zip": "^0.5.16",

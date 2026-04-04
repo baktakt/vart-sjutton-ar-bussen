@@ -10,6 +10,7 @@ const PORT = process.env.PORT ?? 3000;
 const SCRIPTS = {
   static: 'scripts/test-static.js',
   tripupdates: 'scripts/test-tripupdates.js',
+  vasttrafik: 'scripts/test-vasttrafik-api.js',
   vehicles: 'scripts/test-vehicles.js',
 };
 
