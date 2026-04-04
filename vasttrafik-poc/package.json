@@ -4,6 +4,7 @@
   "description": "Data validation scripts for the Västtrafik GTFS PoC",
   "type": "module",
   "scripts": {
+    "build": "echo 'No build step'",
     "ui": "node server.js",
     "test-static": "node scripts/test-static.js",
     "test-tripupdates": "node scripts/test-tripupdates.js",
