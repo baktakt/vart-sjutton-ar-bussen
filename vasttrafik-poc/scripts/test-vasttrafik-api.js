@@ -47,20 +47,35 @@ async function main() {
   const token = await getToken(clientId, clientSecret);
   console.log('Token acquired.\n');
 
-  const params = new URLSearchParams({
-    lowerLeftLat:  BBOX.lowerLeftLat,
-    lowerLeftLong: BBOX.lowerLeftLong,
-    upperRightLat: BBOX.upperRightLat,
-    upperRightLong: BBOX.upperRightLong,
-  });
+  // The public docs are ambiguous — some examples show separate lat/long params,
+  // others show compound lowerLeft/upperRight. Try both if the first returns an error.
+  async function fetchPositions(token, paramStyle) {
+    const params = paramStyle === 'compound'
+      ? new URLSearchParams({
+          lowerLeft:  `${BBOX.lowerLeftLat},${BBOX.lowerLeftLong}`,
+          upperRight: `${BBOX.upperRightLat},${BBOX.upperRightLong}`,
+        })
+      : new URLSearchParams({
+          lowerLeftLat:   BBOX.lowerLeftLat,
+          lowerLeftLong:  BBOX.lowerLeftLong,
+          upperRightLat:  BBOX.upperRightLat,
+          upperRightLong: BBOX.upperRightLong,
+        });
+    const url = `${API_BASE}/positions?${params}`;
+    console.log(`Trying param style "${paramStyle}": ${url.replace(API_BASE, '')}`);
+    return fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  }
 
-  const url = `${API_BASE}/positions?${params}`;
   console.log(`Fetching /positions...`);
   console.log(`Bounding box: lat ${BBOX.lowerLeftLat}–${BBOX.upperRightLat}, lng ${BBOX.lowerLeftLong}–${BBOX.upperRightLong}\n`);
 
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  let res = await fetchPositions(token, 'separate');
+
+  // Fall back to compound params if the API rejects the separate style
+  if (!res.ok && res.status !== 404) {
+    console.log(`  → HTTP ${res.status}, retrying with compound params...\n`);
+    res = await fetchPositions(token, 'compound');
+  }
 
   if (res.status === 404) {
     console.log('NO VEHICLE POSITIONS AVAILABLE (404)');
