@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getEnrichedVehicles } from '@/lib/pipeline';
 
-export const dynamic = 'force-dynamic';
+export const dynamic    = 'force-dynamic';
+export const maxDuration = 30; // seconds
 
 export async function GET() {
   try {

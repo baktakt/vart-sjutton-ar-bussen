@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { getToken } from '@/lib/vasttrafik/token';
 import type { VTSituation } from '@/types/vasttrafik';
 
-export const dynamic = 'force-dynamic';
+export const dynamic    = 'force-dynamic';
+export const maxDuration = 15;
 
 const TS_BASE = process.env.VASTTRAFIK_TS_BASE ?? 'https://ext-api.vasttrafik.se/ts/v1';
 
