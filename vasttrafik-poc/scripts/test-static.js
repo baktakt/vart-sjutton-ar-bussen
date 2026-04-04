@@ -1,6 +1,14 @@
 import 'dotenv/config';
 import AdmZip from 'adm-zip';
 
+// Count newlines directly on the raw buffer — avoids decoding a 100MB string
+function countLines(buf) {
+  let n = 0;
+  const NL = 0x0a;
+  for (let i = 0; i < buf.length; i++) if (buf[i] === NL) n++;
+  return n;
+}
+
 const ROUTE_TYPE_NAMES = {
   0: 'Tram/Spårvagn (0)',
   1: 'Subway/Tunnelbana (1)',
@@ -11,6 +19,7 @@ const ROUTE_TYPE_NAMES = {
   900: 'Tram/Spårvagn (900)',
   1000: 'Boat (1000)',
   1200: 'Ferry (1200)',
+  1501: 'Demand-responsive/Närtrafik (1501)',
 };
 
 function parseCsv(text) {
@@ -103,8 +112,8 @@ async function main() {
   console.log('\n=== shapes.txt ===');
   const shapesEntry = zip.getEntry('shapes.txt');
   if (shapesEntry) {
-    const shapes = parseCsv(shapesEntry.getData().toString('utf8'));
-    console.log(`  EXISTS — ${shapes.length} rows`);
+    const rows = countLines(shapesEntry.getData()) - 1;
+    console.log(`  EXISTS — ${rows} rows`);
   } else {
     console.log('  NOT FOUND (shapes not included in this feed)');
   }
@@ -113,8 +122,7 @@ async function main() {
   console.log('\n=== stop_times.txt ===');
   const stopTimesEntry = zip.getEntry('stop_times.txt');
   if (stopTimesEntry) {
-    const text = stopTimesEntry.getData().toString('utf8');
-    const rows = text.split('\n').filter(l => l.trim()).length - 1;
+    const rows = countLines(stopTimesEntry.getData()) - 1;
     console.log(`  EXISTS — ${rows} rows`);
   } else {
     console.log('  NOT FOUND');
