@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Västtrafik GTFS PoC</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+      color: #f8fafc;
+    }
+
+    .subtitle {
+      font-size: 0.875rem;
+      color: #64748b;
+      margin-bottom: 2rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .card {
+      background: #1e2330;
+      border: 1px solid #2d3748;
+      border-radius: 0.75rem;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card-header {
+      padding: 1rem 1.25rem 0.75rem;
+      border-bottom: 1px solid #2d3748;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+
+    .card-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #f1f5f9;
+    }
+
+    .card-desc {
+      font-size: 0.75rem;
+      color: #64748b;
+      margin-top: 0.15rem;
+    }
+
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .badge-idle    { background: #1e293b; color: #475569; border: 1px solid #334155; }
+    .badge-running { background: #1d3a5f; color: #60a5fa; border: 1px solid #2563eb; }
+    .badge-ok      { background: #14291f; color: #4ade80; border: 1px solid #16a34a; }
+    .badge-error   { background: #2d1515; color: #f87171; border: 1px solid #dc2626; }
+
+    .card-actions {
+      padding: 0.75rem 1.25rem;
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    button {
+      font-size: 0.8rem;
+      font-weight: 500;
+      padding: 0.45rem 1rem;
+      border-radius: 0.4rem;
+      border: none;
+      cursor: pointer;
+      transition: opacity 0.15s, background 0.15s;
+    }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-run   { background: #2563eb; color: #fff; }
+    .btn-run:hover:not(:disabled) { background: #1d4ed8; }
+    .btn-clear { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+    .btn-clear:hover:not(:disabled) { background: #273244; }
+
+    .output {
+      font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+      font-size: 0.72rem;
+      line-height: 1.6;
+      background: #0d1117;
+      color: #94a3b8;
+      padding: 1rem 1.25rem;
+      overflow-y: auto;
+      max-height: 400px;
+      flex: 1;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .output:empty::before {
+      content: "Output will appear here…";
+      color: #2d3748;
+    }
+
+    .line-stderr { color: #f87171; }
+    .line-meta   { color: #475569; font-style: italic; }
+    .line-stdout { color: #94a3b8; }
+
+    .spinner {
+      display: inline-block;
+      width: 0.6rem;
+      height: 0.6rem;
+      border: 2px solid transparent;
+      border-top-color: #60a5fa;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-right: 0.35rem;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <h1>Västtrafik GTFS PoC</h1>
+  <p class="subtitle">Data validation scripts — run each to probe the Trafiklab feeds.</p>
+
+  <div class="grid" id="grid"></div>
+
+  <script>
+    const SCRIPTS = [
+      {
+        key: 'static',
+        title: 'test-static.js',
+        desc: 'Download vt.zip → route types, stops, trips, shapes',
+      },
+      {
+        key: 'tripupdates',
+        title: 'test-tripupdates.js',
+        desc: 'Fetch TripUpdates.pb → delay distribution, top routes',
+      },
+      {
+        key: 'vehicles',
+        title: 'test-vehicles.js',
+        desc: 'Fetch VehiclePositions.pb → vehicle count or 404 fallback',
+      },
+    ];
+
+    const cards = {};
+
+    function buildCard(script) {
+      const card = document.createElement('div');
+      card.className = 'card';
+
+      card.innerHTML = `
+        <div class="card-header">
+          <div>
+            <div class="card-title">${script.title}</div>
+            <div class="card-desc">${script.desc}</div>
+          </div>
+          <span class="badge badge-idle" id="badge-${script.key}">idle</span>
+        </div>
+        <div class="card-actions">
+          <button class="btn-run" id="run-${script.key}">Run</button>
+          <button class="btn-clear" id="clear-${script.key}">Clear</button>
+        </div>
+        <div class="output" id="output-${script.key}"></div>
+      `;
+
+      document.getElementById('grid').appendChild(card);
+
+      const runBtn   = document.getElementById(`run-${script.key}`);
+      const clearBtn = document.getElementById(`clear-${script.key}`);
+      const output   = document.getElementById(`output-${script.key}`);
+      const badge    = document.getElementById(`badge-${script.key}`);
+
+      cards[script.key] = { runBtn, clearBtn, output, badge, es: null };
+
+      runBtn.addEventListener('click', () => runScript(script.key));
+      clearBtn.addEventListener('click', () => {
+        output.innerHTML = '';
+        setBadge(script.key, 'idle');
+      });
+    }
+
+    function setBadge(key, state) {
+      const { badge } = cards[key];
+      badge.className = 'badge';
+      if (state === 'idle')    { badge.classList.add('badge-idle');    badge.innerHTML = 'idle'; }
+      if (state === 'running') { badge.classList.add('badge-running'); badge.innerHTML = '<span class="spinner"></span>running'; }
+      if (state === 'ok')      { badge.classList.add('badge-ok');      badge.innerHTML = 'done'; }
+      if (state === 'error')   { badge.classList.add('badge-error');   badge.innerHTML = 'error'; }
+    }
+
+    function appendLine(key, text, cls) {
+      const { output } = cards[key];
+      const span = document.createElement('span');
+      span.className = cls;
+      span.textContent = text;
+      output.appendChild(span);
+      output.scrollTop = output.scrollHeight;
+    }
+
+    function runScript(key) {
+      const { runBtn, clearBtn, output, es: prevEs } = cards[key];
+      if (prevEs) prevEs.close();
+
+      output.innerHTML = '';
+      runBtn.disabled = true;
+      clearBtn.disabled = true;
+      setBadge(key, 'running');
+
+      const es = new EventSource(`/run/${key}`);
+      cards[key].es = es;
+
+      es.addEventListener('start', e => {
+        const d = JSON.parse(e.data);
+        appendLine(key, `▶ Started at ${d.time}\n\n`, 'line-meta');
+      });
+
+      es.addEventListener('stdout', e => {
+        appendLine(key, JSON.parse(e.data), 'line-stdout');
+      });
+
+      es.addEventListener('stderr', e => {
+        appendLine(key, JSON.parse(e.data), 'line-stderr');
+      });
+
+      es.addEventListener('done', e => {
+        const d = JSON.parse(e.data);
+        appendLine(key, `\n▶ Exited with code ${d.code}`, 'line-meta');
+        setBadge(key, d.code === 0 ? 'ok' : 'error');
+        runBtn.disabled = false;
+        clearBtn.disabled = false;
+        es.close();
+      });
+
+      es.onerror = () => {
+        appendLine(key, '\n[connection error]', 'line-stderr');
+        setBadge(key, 'error');
+        runBtn.disabled = false;
+        clearBtn.disabled = false;
+        es.close();
+      };
+    }
+
+    SCRIPTS.forEach(buildCard);
+  </script>
+</body>
+</html>
