@@ -232,7 +232,7 @@
       clearBtn.disabled = true;
       setBadge(key, 'running');
 
-      const es = new EventSource(`/run/${key}`);
+      const es = new EventSource(`/api/run/${key}`);
       cards[key].es = es;
 
       es.addEventListener('start', e => {
