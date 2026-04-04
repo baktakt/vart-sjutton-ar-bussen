@@ -1,0 +1,16 @@
+{
+  "name": "vasttrafik-poc",
+  "version": "1.0.0",
+  "description": "Data validation scripts for the Västtrafik GTFS PoC",
+  "type": "module",
+  "scripts": {
+    "test-static": "node scripts/test-static.js",
+    "test-tripupdates": "node scripts/test-tripupdates.js",
+    "test-vehicles": "node scripts/test-vehicles.js"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "dotenv": "^16.4.7",
+    "gtfs-realtime-bindings": "^1.1.1"
+  }
+}
