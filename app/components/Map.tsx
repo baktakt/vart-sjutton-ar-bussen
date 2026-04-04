@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { MapContainer, TileLayer } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
 import VehicleLayer from '@/components/VehicleLayer';
 import type { EnrichedVehicle, VehiclesResponse } from '@/types/vasttrafik';
 

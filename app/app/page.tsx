@@ -1,3 +1,5 @@
+'use client';
+
 import dynamic from 'next/dynamic';
 
 const TransitMap = dynamic(() => import('@/components/Map'), { ssr: false });
