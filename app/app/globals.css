@@ -27,7 +27,19 @@ html, body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Pulsing "you are here" dot */
+/* Remove default Leaflet popup chrome for stop departure boards */
+.stop-popup .leaflet-popup-content-wrapper {
+  background: transparent;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.6);
+  border-radius: 10px;
+  padding: 0;
+}
+.stop-popup .leaflet-popup-content {
+  margin: 0;
+}
+.stop-popup .leaflet-popup-tip-container {
+  display: none;
+}
 .user-location-dot {
   width: 16px;
   height: 16px;

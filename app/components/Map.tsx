@@ -14,11 +14,17 @@ const CENTER: [number, number] = [57.7089, 11.9746];
 const ZOOM    = 13;
 const POLL_MS = 15_000;
 
-// Captures live map bounds and passes them up via a ref
-function BoundsTracker({ boundsRef }: { boundsRef: React.MutableRefObject<string | null> }) {
+// Captures live map bounds; calls onMove when user pans/zooms
+function BoundsTracker({
+  boundsRef,
+  onMove,
+}: {
+  boundsRef: React.MutableRefObject<string | null>;
+  onMove: () => void;
+}) {
   useMapEvents({
-    moveend: e => { boundsRef.current = toBoundsParam(e.target.getBounds()); },
-    zoomend: e => { boundsRef.current = toBoundsParam(e.target.getBounds()); },
+    moveend: e => { boundsRef.current = toBoundsParam(e.target.getBounds()); onMove(); },
+    zoomend: e => { boundsRef.current = toBoundsParam(e.target.getBounds()); onMove(); },
   });
   return null;
 }
@@ -52,7 +58,8 @@ export default function TransitMap() {
   const [error,     setError]     = useState<string | null>(null);
   const [filter,    setFilter]    = useState<FilterState>(DEFAULT_FILTER);
   const [geoError,  setGeoError]  = useState<string | null>(null);
-  const boundsRef   = useRef<string | null>(null);
+  const [mapDirty,  setMapDirty]  = useState(false);
+  const boundsRef    = useRef<string | null>(null);
   const locateTrigger = useRef<(() => void) | null>(null);
 
   const poll = useCallback(async () => {
@@ -66,6 +73,7 @@ export default function TransitMap() {
       setVehicles(data.vehicles);
       setFetchedAt(data.fetchedAt);
       setError(null);
+      setMapDirty(false);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -146,13 +154,30 @@ export default function TransitMap() {
         </div>
       </div>
 
+      {/* "Sök i området" pill — appears after panning/zooming */}
+      {mapDirty && !loading && (
+        <div className="absolute z-[999] left-1/2 -translate-x-1/2" style={{ top: 96 }}>
+          <button
+            onClick={() => { setMapDirty(false); poll(); }}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white text-slate-800
+                       font-semibold text-sm shadow-lg hover:bg-slate-50 active:scale-95
+                       transition-transform"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            Sök i området
+          </button>
+        </div>
+      )}
+
       {/* Map */}
       <MapContainer center={CENTER} zoom={ZOOM} className="w-full h-full" zoomControl={false}>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <BoundsTracker boundsRef={boundsRef} />
+        <BoundsTracker boundsRef={boundsRef} onMove={() => setMapDirty(true)} />
         <GeolocationController
           triggerRef={locateTrigger}
           onLocation={handleLocation}
