@@ -221,6 +221,40 @@ async function main() {
   for (const [label, count] of Object.entries(byType).sort()) {
     console.log(`  ${label}: ${count}`);
   }
+
+  // 6. Parse stops.txt → write stops.json (all stop areas for the map)
+  console.log('\nParsing stops.txt…');
+  const stopsBuf  = zip.getEntry('stops.txt').getData();
+  const stopsGen  = iterLines(stopsBuf);
+  const stopHdrs  = parseHeaders(stopsGen.next().value);
+  const iStopId   = stopHdrs.indexOf('stop_id');
+  const iStopName = stopHdrs.indexOf('stop_name');
+  const iStopLat  = stopHdrs.indexOf('stop_lat');
+  const iStopLon  = stopHdrs.indexOf('stop_lon');
+  const iLocType  = stopHdrs.indexOf('location_type');
+  const iParent   = stopHdrs.indexOf('parent_station');
+
+  const stopList = [];
+  for (const line of stopsGen) {
+    const cols     = line.split(',');
+    const locType  = cols[iLocType]?.trim();
+    const parent   = cols[iParent]?.trim();
+    // Keep stop areas (location_type=1) OR standalone stops (no parent, location_type=0/"")
+    if (locType === '1' || (!parent && (locType === '0' || locType === ''))) {
+      const lat  = parseFloat(cols[iStopLat]);
+      const lon  = parseFloat(cols[iStopLon]);
+      const name = cols[iStopName]?.trim().replace(/^"|"$/g, '') ?? '';
+      if (!isNaN(lat) && !isNaN(lon)) {
+        stopList.push({ id: cols[iStopId]?.trim(), name, lat, lng: lon });
+      }
+    }
+  }
+
+  fs.writeFileSync(
+    path.join(OUT_DIR, 'stops.json'),
+    JSON.stringify({ generatedAt: new Date().toISOString(), stops: stopList }),
+  );
+  console.log(`  ${stopList.length} stops written to public/shapes/stops.json`);
 }
 
 main().catch(err => { console.error('FATAL:', err.message); process.exit(1); });

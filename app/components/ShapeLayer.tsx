@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState, useMemo } from 'react';
-import { Polyline } from 'react-leaflet';
+import { Polyline, Tooltip } from 'react-leaflet';
+import type { PathOptions } from 'leaflet';
 import type { EnrichedVehicle } from '@/types/vasttrafik';
 
 interface ShapeFile {
@@ -83,20 +84,31 @@ export default function ShapeLayer({ vehicles }: Props) {
     });
   }, [activeLineNames, manifest, loadedShapes]);
 
+  const ROUTE_TYPE_LABELS: Record<number, string> = {
+    100: 'Tåg', 700: 'Buss', 900: 'Spårvagn', 1000: 'Båt', 1200: 'Färja',
+  };
+
   return (
     <>
       {[...activeLineNames].map(name => {
         const shape = loadedShapes.get(name);
         if (!shape || shape.coordinates.length < 2) return null;
-        const color = lineColors.get(name) ?? '#94a3b8';
+        const color   = lineColors.get(name) ?? '#94a3b8';
+        const normal: PathOptions  = { color, weight: 4, opacity: 0.55 };
+        const hovered: PathOptions = { color, weight: 7, opacity: 0.85 };
+        const typeLabel = ROUTE_TYPE_LABELS[shape.routeType] ?? `Typ ${shape.routeType}`;
         return (
           <Polyline
             key={name}
             positions={shape.coordinates}
-            color={color}
-            weight={4}
-            opacity={0.55}
-          />
+            pathOptions={normal}
+            eventHandlers={{
+              mouseover: e => { e.target.setStyle(hovered); e.target.bringToFront(); },
+              mouseout:  e => { e.target.setStyle(normal); },
+            }}
+          >
+            <Tooltip sticky>{typeLabel} {name}</Tooltip>
+          </Polyline>
         );
       })}
     </>

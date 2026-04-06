@@ -3,15 +3,20 @@
 import { useEffect, useRef } from 'react';
 import { useMap } from 'react-leaflet';
 import L from 'leaflet';
+import 'leaflet.markercluster';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import type { EnrichedVehicle } from '@/types/vasttrafik';
 
-function delayRingColor(v: EnrichedVehicle): string {
-  if (v.isCancelled)                              return '#6b7280'; // grey
-  if (v.delayMinutes === null)                    return 'transparent';
-  if (v.delayMinutes > 5)                         return '#ef4444'; // red
-  if (v.delayMinutes > 1)                         return '#f59e0b'; // amber
-  if (v.delayMinutes < -1)                        return '#22c55e'; // green early
-  return 'transparent'; // on time — no ring
+// ─── Delay helpers ────────────────────────────────────────────────────────────
+
+function ringColor(v: EnrichedVehicle): string {
+  if (v.isCancelled)                   return '#6b7280';
+  if (v.delayMinutes === null)          return 'transparent';
+  if (v.delayMinutes > 5)              return '#ef4444';
+  if (v.delayMinutes > 1)              return '#f59e0b';
+  if (v.delayMinutes < -1)             return '#22c55e';
+  return 'transparent';
 }
 
 function delayLabel(v: EnrichedVehicle): string {
@@ -23,23 +28,23 @@ function delayLabel(v: EnrichedVehicle): string {
 }
 
 function makeIcon(v: EnrichedVehicle): L.DivIcon {
-  const ring  = delayRingColor(v);
-  const label = delayLabel(v);
-  const border = ring !== 'transparent' ? `3px solid ${ring}` : `2px solid ${v.fgColor}44`;
+  const ring   = ringColor(v);
+  const label  = delayLabel(v);
+  const border = ring !== 'transparent'
+    ? `3px solid ${ring}`
+    : `2px solid ${v.fgColor}44`;
 
   return L.divIcon({
-    className: '',
-    iconSize:  [36, 36],
-    iconAnchor:[18, 18],
-    html: `
-      <div style="
+    className:  '',
+    iconSize:   [36, 36],
+    iconAnchor: [18, 18],
+    html: `<div style="
         width:36px;height:36px;border-radius:50%;
         background:${v.bgColor};color:${v.fgColor};
         border:${border};
         display:flex;flex-direction:column;align-items:center;justify-content:center;
         font-family:system-ui,sans-serif;font-weight:700;
-        box-shadow:0 1px 4px rgba(0,0,0,.4);
-        cursor:pointer;
+        box-shadow:0 1px 4px rgba(0,0,0,.4);cursor:pointer;
       ">
         <span style="font-size:10px;line-height:1">${v.lineName}</span>
         ${label ? `<span style="font-size:8px;line-height:1;opacity:.9">${label}</span>` : ''}
@@ -47,50 +52,57 @@ function makeIcon(v: EnrichedVehicle): L.DivIcon {
   });
 }
 
-interface Props {
-  vehicles: EnrichedVehicle[];
+function tooltipHtml(v: EnrichedVehicle): string {
+  const delayStr = v.isCancelled
+    ? '<b style="color:#ef4444">Inställd</b>'
+    : v.delayMinutes === null
+      ? 'Ingen realtid'
+      : v.delayMinutes > 1
+        ? `<b style="color:#ef4444">+${Math.round(v.delayMinutes)} min sen</b>`
+        : v.delayMinutes < -1
+          ? `<b style="color:#22c55e">${Math.round(v.delayMinutes)} min tidig</b>`
+          : '<b style="color:#64748b">I tid</b>';
+  return `<b>Linje ${v.lineName}</b> · ${v.direction}${
+    v.nextStopName ? `<br>→ ${v.nextStopName}` : ''
+  }<br>${delayStr}`;
 }
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+interface Props { vehicles: EnrichedVehicle[] }
 
 export default function VehicleLayer({ vehicles }: Props) {
   const map     = useMap();
-  const markers = useRef(new Map<string, L.Marker>());
+  const cluster = useRef<L.MarkerClusterGroup | null>(null);
 
+  // Create cluster group once, add to map
   useEffect(() => {
-    const incoming = new Set(vehicles.map(v => v.id));
+    const group = L.markerClusterGroup({
+      maxClusterRadius:       60,
+      disableClusteringAtZoom: 15,   // explode to individual markers when zoomed in
+      showCoverageOnHover:    false,
+      spiderfyOnMaxZoom:      true,
+      chunkedLoading:         true,
+    });
+    map.addLayer(group);
+    cluster.current = group;
+    return () => { map.removeLayer(group); };
+  }, [map]);
 
-    // Remove stale markers
-    for (const [id, marker] of markers.current) {
-      if (!incoming.has(id)) {
-        marker.remove();
-        markers.current.delete(id);
-      }
-    }
-
-    // Add or update markers
-    for (const v of vehicles) {
-      const existing = markers.current.get(v.id);
-      const icon     = makeIcon(v);
-      const tooltip  = `<b>Linje ${v.lineName}</b><br>${v.direction}${
-        v.nextStopName ? `<br>→ ${v.nextStopName}` : ''
-      }${v.delayMinutes !== null ? `<br><b>${delayLabel(v) || 'I tid'}</b>` : ''}`;
-
-      if (existing) {
-        existing.setLatLng([v.lat, v.lng]);
-        existing.setIcon(icon);
-        existing.setTooltipContent(tooltip);
-      } else {
-        const marker = L.marker([v.lat, v.lng], { icon })
-          .bindTooltip(tooltip, { direction: 'top', offset: [0, -20] })
-          .addTo(map);
-        markers.current.set(v.id, marker);
-      }
-    }
-  }, [vehicles, map]);
-
-  // Cleanup on unmount
+  // On each data update: bulk-replace all markers
   useEffect(() => {
-    return () => { markers.current.forEach(m => m.remove()); markers.current.clear(); };
-  }, []);
+    const group = cluster.current;
+    if (!group) return;
+
+    group.clearLayers();
+
+    const newMarkers = vehicles.map(v =>
+      L.marker([v.lat, v.lng], { icon: makeIcon(v) })
+        .bindTooltip(tooltipHtml(v), { direction: 'top', offset: [0, -20] })
+    );
+
+    group.addLayers(newMarkers); // single bulk re-cluster
+  }, [vehicles]);
 
   return null;
 }

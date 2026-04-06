@@ -1,17 +1,18 @@
 import { getToken }         from '@/lib/vasttrafik/token';
 import { fetchPositions }   from '@/lib/vasttrafik/positions';
+import type { BBox }        from '@/lib/vasttrafik/positions';
 import { getNearestStopArea } from '@/lib/vasttrafik/locations';
 import { fetchDepartures }  from '@/lib/vasttrafik/departures';
 import { getCachedStopArea, setCachedStopArea, positionKey } from '@/lib/cache/stop-area';
 import { getCachedDepartures, setCachedDepartures }          from '@/lib/cache/departures';
 import type { EnrichedVehicle, VehiclesResponse }            from '@/types/vasttrafik';
 
-export async function getEnrichedVehicles(): Promise<VehiclesResponse> {
+export async function getEnrichedVehicles(bbox?: BBox): Promise<VehiclesResponse> {
   const errors: string[] = [];
   const token = await getToken();
 
-  // 1. Fetch all live vehicles
-  const vehicles = await fetchPositions(token);
+  // 1. Fetch all live vehicles (using viewport bbox if provided)
+  const vehicles = await fetchPositions(token, bbox);
 
   // 2. Collect unique quantized positions → resolve stop area GIDs (parallel, cached)
   const uniqueKeys = [...new Set(vehicles.map(v => positionKey(v.latitude, v.longitude)))];

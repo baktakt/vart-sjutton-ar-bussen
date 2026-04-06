@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
-import { MapContainer, TileLayer } from 'react-leaflet';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { MapContainer, TileLayer, useMapEvents } from 'react-leaflet';
 import VehicleLayer from '@/components/VehicleLayer';
 import ShapeLayer   from '@/components/ShapeLayer';
+import StopLayer    from '@/components/StopLayer';
 import FilterBar, { DEFAULT_FILTER, applyFilter } from '@/components/FilterBar';
 import type { FilterState } from '@/components/FilterBar';
 import type { EnrichedVehicle, VehiclesResponse } from '@/types/vasttrafik';
@@ -11,6 +12,27 @@ import type { EnrichedVehicle, VehiclesResponse } from '@/types/vasttrafik';
 const CENTER: [number, number] = [57.7089, 11.9746];
 const ZOOM    = 13;
 const POLL_MS = 15_000;
+
+// Captures live map bounds and passes them up via a ref
+function BoundsTracker({ boundsRef }: { boundsRef: React.MutableRefObject<string | null> }) {
+  useMapEvents({
+    moveend: e => { boundsRef.current = toBoundsParam(e.target.getBounds()); },
+    zoomend: e => { boundsRef.current = toBoundsParam(e.target.getBounds()); },
+  });
+  return null;
+}
+
+function toBoundsParam(b: L.LatLngBounds): string {
+  return [
+    b.getSouthWest().lat.toFixed(5),
+    b.getSouthWest().lng.toFixed(5),
+    b.getNorthEast().lat.toFixed(5),
+    b.getNorthEast().lng.toFixed(5),
+  ].join(',');
+}
+
+// Need L type for toBoundsParam signature
+import type L from 'leaflet';
 
 function DelayBadge({ count, label, color }: { count: number; label: string; color: string }) {
   return (
@@ -28,10 +50,14 @@ export default function TransitMap() {
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState<string | null>(null);
   const [filter,    setFilter]    = useState<FilterState>(DEFAULT_FILTER);
+  const boundsRef = useRef<string | null>(null);
 
   const poll = useCallback(async () => {
+    const url = boundsRef.current
+      ? `/api/vehicles?bounds=${boundsRef.current}`
+      : '/api/vehicles';
     try {
-      const res  = await fetch('/api/vehicles', { cache: 'no-store' });
+      const res  = await fetch(url, { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data: VehiclesResponse = await res.json();
       setVehicles(data.vehicles);
@@ -58,7 +84,7 @@ export default function TransitMap() {
 
   // Stage 2: + onlyLate — vehicle dots follow this
   const displayed = useMemo(
-    () => filter.onlyLate ? applyFilter(modeFiltered, { ...filter }) : modeFiltered,
+    () => filter.onlyLate ? applyFilter(modeFiltered, filter) : modeFiltered,
     [modeFiltered, filter],
   );
 
@@ -85,7 +111,6 @@ export default function TransitMap() {
               </p>
             )}
           </div>
-
           <div className="flex gap-3 ml-auto flex-wrap items-center">
             <DelayBadge count={late}      label="Sena"   color="#ef4444" />
             <DelayBadge count={early}     label="Tidiga" color="#22c55e" />
@@ -104,18 +129,14 @@ export default function TransitMap() {
       </div>
 
       {/* Map */}
-      <MapContainer
-        center={CENTER}
-        zoom={ZOOM}
-        className="w-full h-full"
-        zoomControl={false}
-      >
+      <MapContainer center={CENTER} zoom={ZOOM} className="w-full h-full" zoomControl={false}>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        {/* Shapes behind vehicles */}
-        <ShapeLayer vehicles={modeFiltered} />
+        <BoundsTracker boundsRef={boundsRef} />
+        <ShapeLayer   vehicles={modeFiltered} />
+        <StopLayer />
         <VehicleLayer vehicles={displayed} />
       </MapContainer>
     </div>
