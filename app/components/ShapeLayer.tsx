@@ -18,19 +18,30 @@ interface ManifestEntry {
 }
 
 interface Props {
-  // mode-filtered vehicles (not late-filtered) — determines which lines get shapes
   vehicles: EnrichedVehicle[];
 }
+
+// Fallback colours by GTFS route type (shown before vehicle data arrives)
+const TYPE_COLOR: Record<number, string> = {
+  100:  '#7c3aed', // Train   — purple
+  700:  '#64748b', // Bus     — slate
+  900:  '#0ea5e9', // Tram    — sky blue
+  1000: '#0891b2', // Ferry   — cyan
+  1200: '#0891b2',
+};
+
+const ROUTE_TYPE_LABELS: Record<number, string> = {
+  100: 'Tåg', 700: 'Buss', 900: 'Spårvagn', 1000: 'Båt', 1200: 'Färja',
+};
 
 export default function ShapeLayer({ vehicles }: Props) {
   const [manifest,     setManifest]     = useState<ManifestEntry[]>([]);
   const [loadedShapes, setLoadedShapes] = useState<Map<string, ShapeFile>>(new Map());
-  // Tracks in-flight + completed fetches so we never double-fetch
-  const fetching    = useRef(new Set<string>());
-  // Persistent colour map — keeps colour even when vehicle leaves the viewport
-  const colorCache  = useRef(new Map<string, string>());
+  const fetching   = useRef(new Set<string>());
+  // Persistent colour map — survives vehicle leaving the viewport
+  const colorCache = useRef(new Map<string, string>());
 
-  // Load manifest once
+  // ── Load manifest once ──────────────────────────────────────────────────────
   useEffect(() => {
     fetch('/shapes/manifest.json')
       .then(r => r.ok ? r.json() : null)
@@ -38,41 +49,18 @@ export default function ShapeLayer({ vehicles }: Props) {
       .catch(() => {});
   }, []);
 
-  // Active line names from current vehicles (used only for deciding what to fetch)
-  const activeLineNames = useMemo(
-    () => new Set(vehicles.map(v => v.lineName)),
-    [vehicles],
-  );
-
-  // Keep colour cache up-to-date whenever vehicles change
-  useEffect(() => {
-    for (const v of vehicles) {
-      if (!colorCache.current.has(v.lineName)) {
-        colorCache.current.set(v.lineName, v.bgColor);
-      }
-    }
-  }, [vehicles]);
-
-  // Fetch shape files for newly-active lines (never re-fetches already-loaded ones)
-  useEffect(() => {
-    if (manifest.length === 0) return;
-
-    const byName  = new Map(manifest.map(e => [e.name, e]));
-    const toFetch = [...activeLineNames].filter(
-      name => !fetching.current.has(name) && !loadedShapes.has(name),
-    );
+  // ── Fetch helper ────────────────────────────────────────────────────────────
+  function fetchShapes(entries: ManifestEntry[]) {
+    const toFetch = entries.filter(e => !fetching.current.has(e.name));
     if (toFetch.length === 0) return;
-
-    toFetch.forEach(name => fetching.current.add(name));
+    toFetch.forEach(e => fetching.current.add(e.name));
 
     Promise.all(
-      toFetch.map(async name => {
-        const entry = byName.get(name);
-        if (!entry) return null;
+      toFetch.map(async entry => {
         try {
           const res = await fetch(`/shapes/${entry.file}`);
           if (!res.ok) return null;
-          return [name, await res.json() as ShapeFile] as const;
+          return [entry.name, await res.json() as ShapeFile] as const;
         } catch { return null; }
       }),
     ).then(results => {
@@ -84,23 +72,53 @@ export default function ShapeLayer({ vehicles }: Props) {
         return next;
       });
     });
+  }
+
+  // ── On manifest load: immediately fetch all non-bus shapes ─────────────────
+  // Trams (900) = 171 KB, Trains (100) = 554 KB, Boats (1000) = 26 KB → ~751 KB total
+  // Buses (700) = 12 MB → lazy-load only when a bus appears in the area
+  useEffect(() => {
+    if (manifest.length === 0) return;
+    fetchShapes(manifest.filter(e => e.routeType !== 700));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeLineNames, manifest]); // ← loadedShapes intentionally excluded; fetching ref guards re-fetches
+  }, [manifest]);
 
-  const ROUTE_TYPE_LABELS: Record<number, string> = {
-    100: 'Tåg', 700: 'Buss', 900: 'Spårvagn', 1000: 'Båt', 1200: 'Färja',
-  };
+  // ── Active bus line names (for lazy bus shape loading) ─────────────────────
+  const activeBusNames = useMemo(
+    () => new Set(vehicles.filter(v => v.transportMode === 'bus').map(v => v.lineName)),
+    [vehicles],
+  );
 
+  // ── Lazy-load bus shapes when a bus vehicle appears ────────────────────────
+  useEffect(() => {
+    if (manifest.length === 0 || activeBusNames.size === 0) return;
+    const byName = new Map(manifest.map(e => [e.name, e]));
+    fetchShapes(
+      [...activeBusNames]
+        .map(name => byName.get(name))
+        .filter((e): e is ManifestEntry => !!e),
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBusNames, manifest]);
+
+  // ── Update colour cache from live vehicle data ─────────────────────────────
+  useEffect(() => {
+    for (const v of vehicles) {
+      if (!colorCache.current.has(v.lineName)) {
+        colorCache.current.set(v.lineName, v.bgColor);
+      }
+    }
+  }, [vehicles]);
+
+  // ── Render all loaded shapes ───────────────────────────────────────────────
   return (
     <>
-      {[...loadedShapes.keys()].map(name => {
-        const shape = loadedShapes.get(name);
-        if (!shape || shape.coordinates.length < 2) return null;
-        // Use persistent cache — colour stays even when vehicle leaves the viewport
-        const color = colorCache.current.get(name) ?? '#94a3b8';
+      {[...loadedShapes.entries()].map(([name, shape]) => {
+        if (shape.coordinates.length < 2) return null;
+        const color     = colorCache.current.get(name) ?? TYPE_COLOR[shape.routeType] ?? '#94a3b8';
+        const typeLabel = ROUTE_TYPE_LABELS[shape.routeType] ?? '';
         const normal: PathOptions  = { color, weight: 4, opacity: 0.55 };
-        const hovered: PathOptions = { color, weight: 7, opacity: 0.85 };
-        const typeLabel = ROUTE_TYPE_LABELS[shape.routeType] ?? `Typ ${shape.routeType}`;
+        const hovered: PathOptions = { color, weight: 7, opacity: 0.9 };
         return (
           <Polyline
             key={name}
