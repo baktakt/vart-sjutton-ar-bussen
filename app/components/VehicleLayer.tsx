@@ -11,11 +11,11 @@ import type { EnrichedVehicle } from '@/types/vasttrafik';
 // ─── Icon helpers ─────────────────────────────────────────────────────────────
 
 function ringColor(v: EnrichedVehicle): string {
-  if (v.isCancelled)          return '#6b7280';
-  if (v.delayMinutes === null) return 'transparent';
-  if (v.delayMinutes > 5)     return '#ef4444';
-  if (v.delayMinutes > 1)     return '#f59e0b';
-  if (v.delayMinutes < -1)    return '#22c55e';
+  if (v.isCancelled)           return '#6b7280';
+  if (v.delayMinutes === null)  return 'transparent';
+  if (v.delayMinutes > 5)      return '#ef4444';
+  if (v.delayMinutes > 1)      return '#f59e0b';
+  if (v.delayMinutes < -1)     return '#22c55e';
   return 'transparent';
 }
 
@@ -33,7 +33,6 @@ function makeIcon(v: EnrichedVehicle): L.DivIcon {
   const border = ring !== 'transparent'
     ? `3px solid ${ring}`
     : `2px solid ${v.fgColor}44`;
-
   return L.divIcon({
     className:  '',
     iconSize:   [36, 36],
@@ -44,8 +43,7 @@ function makeIcon(v: EnrichedVehicle): L.DivIcon {
         border:${border};
         display:flex;flex-direction:column;align-items:center;justify-content:center;
         font-family:system-ui,sans-serif;font-weight:700;
-        box-shadow:0 1px 4px rgba(0,0,0,.4);cursor:pointer;
-      ">
+        box-shadow:0 1px 4px rgba(0,0,0,.4);cursor:pointer;">
         <span style="font-size:10px;line-height:1">${v.lineName}</span>
         ${label ? `<span style="font-size:8px;line-height:1;opacity:.9">${label}</span>` : ''}
       </div>`,
@@ -67,7 +65,15 @@ function tooltipHtml(v: EnrichedVehicle): string {
   }<br>${delayStr}`;
 }
 
-// ─── Animation helpers ────────────────────────────────────────────────────────
+/**
+ * A stable key that represents the vehicle's visual state.
+ * setIcon is only called when this changes, preventing tooltip flicker.
+ */
+function iconKey(v: EnrichedVehicle): string {
+  return `${v.lineName}|${v.delayMinutes ?? 'null'}|${v.isCancelled}`;
+}
+
+// ─── Animation ────────────────────────────────────────────────────────────────
 
 interface AnimState {
   fromLat: number;
@@ -76,16 +82,18 @@ interface AnimState {
   toLng:   number;
   startMs: number;
   durMs:   number;
+  // Cached rendered position — avoids calling getLatLng() each RAF tick
+  curLat:  number;
+  curLng:  number;
 }
 
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
-// Vehicles rarely travel >1 km between 15s polls; if they do it's a GPS glitch
-const TELEPORT_THRESHOLD_DEG = 0.01; // ~1 km
-const POLL_MS    = 15_000;
-const RAF_STEP   = 100; // ms between position updates (~10 fps)
+// If a vehicle moves more than ~1 km between polls it's a GPS jump — snap instead
+const TELEPORT_DEG = 0.01;
+const POLL_MS      = 15_000;
+// Skip a setLatLng call if the new position is indistinguishably close to current
+const MIN_DELTA    = 1e-7;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -96,10 +104,10 @@ export default function VehicleLayer({ vehicles }: Props) {
   const cluster    = useRef<L.MarkerClusterGroup | null>(null);
   const markers    = useRef(new Map<string, L.Marker>());
   const animStates = useRef(new Map<string, AnimState>());
+  const iconKeys   = useRef(new Map<string, string>());   // last-rendered icon state
   const rafId      = useRef<number | null>(null);
-  const lastStep   = useRef(0);
 
-  // ── Create cluster group once ──────────────────────────────────────────────
+  // ── Cluster group ──────────────────────────────────────────────────────────
   useEffect(() => {
     const group = L.markerClusterGroup({
       maxClusterRadius:        60,
@@ -113,31 +121,32 @@ export default function VehicleLayer({ vehicles }: Props) {
     return () => { map.removeLayer(group); };
   }, [map]);
 
-  // ── RAF animation loop (runs for lifetime of component) ───────────────────
+  // ── 60 fps RAF loop ────────────────────────────────────────────────────────
   useEffect(() => {
-    const tick = (ts: number) => {
+    const tick = () => {
       rafId.current = requestAnimationFrame(tick);
-
-      // Throttle updates
-      if (ts - lastStep.current < RAF_STEP) return;
-      lastStep.current = ts;
-
       if (animStates.current.size === 0) return;
 
       const now = Date.now();
       for (const [id, anim] of animStates.current) {
-        const marker = markers.current.get(id);
-        if (!marker) continue;
-        const t = Math.min(1, (now - anim.startMs) / anim.durMs);
-        marker.setLatLng([lerp(anim.fromLat, anim.toLat, t), lerp(anim.fromLng, anim.toLng, t)]);
+        if (anim.startMs === 0) continue; // static / not yet moving
+        const t   = Math.min(1, (now - anim.startMs) / anim.durMs);
+        const lat = lerp(anim.fromLat, anim.toLat, t);
+        const lng = lerp(anim.fromLng, anim.toLng, t);
+
+        // Skip DOM update if movement is sub-pixel
+        if (Math.abs(lat - anim.curLat) < MIN_DELTA && Math.abs(lng - anim.curLng) < MIN_DELTA) continue;
+
+        markers.current.get(id)?.setLatLng([lat, lng]);
+        anim.curLat = lat;
+        anim.curLng = lng;
       }
     };
-
     rafId.current = requestAnimationFrame(tick);
     return () => { if (rafId.current !== null) cancelAnimationFrame(rafId.current); };
-  }, []); // start once
+  }, []);
 
-  // ── Diff incoming vehicles against persistent markers ─────────────────────
+  // ── Diff incoming vehicles ─────────────────────────────────────────────────
   useEffect(() => {
     const group = cluster.current;
     if (!group) return;
@@ -145,43 +154,56 @@ export default function VehicleLayer({ vehicles }: Props) {
     const now      = Date.now();
     const incoming = new Map(vehicles.map(v => [v.id, v]));
 
-    // Remove vehicles that are no longer reported
+    // Remove departed vehicles
     for (const [id, marker] of markers.current) {
       if (!incoming.has(id)) {
         group.removeLayer(marker);
         markers.current.delete(id);
         animStates.current.delete(id);
+        iconKeys.current.delete(id);
       }
     }
 
-    // Update existing or create new markers
     for (const v of vehicles) {
       const existing = markers.current.get(v.id);
+      const prevAnim = animStates.current.get(v.id);
 
       if (existing) {
-        const pos  = existing.getLatLng();
-        const dist = Math.hypot(v.lat - pos.lat, v.lng - pos.lng);
-        const snap = dist > TELEPORT_THRESHOLD_DEG;
+        // Use our cached position as the animation origin (avoids getLatLng() call)
+        const fromLat = prevAnim?.curLat ?? v.lat;
+        const fromLng = prevAnim?.curLng ?? v.lng;
+        const dist    = Math.hypot(v.lat - fromLat, v.lng - fromLng);
+        const snap    = dist > TELEPORT_DEG;
 
         animStates.current.set(v.id, {
-          fromLat: snap ? v.lat : pos.lat,
-          fromLng: snap ? v.lng : pos.lng,
+          fromLat: snap ? v.lat : fromLat,
+          fromLng: snap ? v.lng : fromLng,
           toLat:   v.lat,
           toLng:   v.lng,
           startMs: now,
           durMs:   snap ? 1 : POLL_MS,
+          curLat:  snap ? v.lat : fromLat,
+          curLng:  snap ? v.lng : fromLng,
         });
 
-        // Update icon in case delay status changed
-        existing.setIcon(makeIcon(v));
-        existing.setTooltipContent(tooltipHtml(v));
+        // Only rebuild the icon if delay / cancelled state has changed.
+        // This prevents the tooltip from flickering on every poll.
+        const key = iconKey(v);
+        if (iconKeys.current.get(v.id) !== key) {
+          existing.setIcon(makeIcon(v));
+          existing.setTooltipContent(tooltipHtml(v));
+          iconKeys.current.set(v.id, key);
+        }
       } else {
-        // First time we see this vehicle — place immediately, no animation
+        // First sighting — place immediately
         animStates.current.set(v.id, {
           fromLat: v.lat, fromLng: v.lng,
           toLat:   v.lat, toLng:   v.lng,
-          startMs: now,   durMs:   POLL_MS,
+          startMs: 0,     durMs:   POLL_MS,
+          curLat:  v.lat, curLng:  v.lng,
         });
+        iconKeys.current.set(v.id, iconKey(v));
+
         const marker = L.marker([v.lat, v.lng], { icon: makeIcon(v) })
           .bindTooltip(tooltipHtml(v), { direction: 'top', offset: [0, -20] });
         group.addLayer(marker);
@@ -195,6 +217,7 @@ export default function VehicleLayer({ vehicles }: Props) {
     if (rafId.current !== null) cancelAnimationFrame(rafId.current);
     markers.current.clear();
     animStates.current.clear();
+    iconKeys.current.clear();
   }, []);
 
   return null;
