@@ -98,12 +98,12 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 function moveMarker(marker: L.Marker, lat: number, lng: number): void {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const m = marker as any;
+  // Guard: marker may be detached from map during cluster recalc or unmount.
+  // m.update() calls this._map.latLngToLayerPoint() — throws if _map is null.
+  if (!m._map) return;
   const latlng = L.latLng(lat, lng);
   m._latlng = latlng;
-  m.update(); // recalculates screen pos + sets transform, no events
-
-  // Tooltip won't follow because we suppressed the 'move' event —
-  // update it directly so an open tooltip stays anchored to the marker.
+  m.update();
   marker.getTooltip()?.setLatLng(latlng);
 }
 
@@ -145,20 +145,22 @@ export default function VehicleLayer({ vehicles }: Props) {
       rafId.current = requestAnimationFrame(tick);
       if (animStates.current.size === 0) return;
 
-      const now = Date.now();
-      for (const [id, anim] of animStates.current) {
-        if (anim.startMs === 0) continue; // static / not yet moving
-        const t   = Math.min(1, (now - anim.startMs) / anim.durMs);
-        const lat = lerp(anim.fromLat, anim.toLat, t);
-        const lng = lerp(anim.fromLng, anim.toLng, t);
-
-        // Skip DOM update if movement is sub-pixel
-        if (Math.abs(lat - anim.curLat) < MIN_DELTA && Math.abs(lng - anim.curLng) < MIN_DELTA) continue;
-
-        const m = markers.current.get(id);
-        if (m) moveMarker(m, lat, lng);
-        anim.curLat = lat;
-        anim.curLng = lng;
+      try {
+        const now = Date.now();
+        for (const [id, anim] of animStates.current) {
+          if (anim.startMs === 0) continue;
+          const t   = Math.min(1, (now - anim.startMs) / anim.durMs);
+          const lat = lerp(anim.fromLat, anim.toLat, t);
+          const lng = lerp(anim.fromLng, anim.toLng, t);
+          if (Math.abs(lat - anim.curLat) < MIN_DELTA && Math.abs(lng - anim.curLng) < MIN_DELTA) continue;
+          const m = markers.current.get(id);
+          if (m) moveMarker(m, lat, lng);
+          anim.curLat = lat;
+          anim.curLng = lng;
+        }
+      } catch (err) {
+        // Swallow — a single bad frame should never crash the page
+        console.warn('[VehicleLayer] animation tick error:', err);
       }
     };
     rafId.current = requestAnimationFrame(tick);
