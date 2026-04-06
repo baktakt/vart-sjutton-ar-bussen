@@ -23,12 +23,14 @@ interface Props {
 }
 
 export default function ShapeLayer({ vehicles }: Props) {
-  const [manifest,    setManifest]    = useState<ManifestEntry[]>([]);
+  const [manifest,     setManifest]     = useState<ManifestEntry[]>([]);
   const [loadedShapes, setLoadedShapes] = useState<Map<string, ShapeFile>>(new Map());
   // Tracks in-flight + completed fetches so we never double-fetch
-  const fetching = useRef(new Set<string>());
+  const fetching    = useRef(new Set<string>());
+  // Persistent colour map — keeps colour even when vehicle leaves the viewport
+  const colorCache  = useRef(new Map<string, string>());
 
-  // Load manifest once — silently no-ops if shapes haven't been generated yet
+  // Load manifest once
   useEffect(() => {
     fetch('/shapes/manifest.json')
       .then(r => r.ok ? r.json() : null)
@@ -36,24 +38,26 @@ export default function ShapeLayer({ vehicles }: Props) {
       .catch(() => {});
   }, []);
 
-  // Active line names from current vehicles
+  // Active line names from current vehicles (used only for deciding what to fetch)
   const activeLineNames = useMemo(
     () => new Set(vehicles.map(v => v.lineName)),
     [vehicles],
   );
 
-  // Line name → color from live vehicle data
-  const lineColors = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const v of vehicles) if (!m.has(v.lineName)) m.set(v.lineName, v.bgColor);
-    return m;
+  // Keep colour cache up-to-date whenever vehicles change
+  useEffect(() => {
+    for (const v of vehicles) {
+      if (!colorCache.current.has(v.lineName)) {
+        colorCache.current.set(v.lineName, v.bgColor);
+      }
+    }
   }, [vehicles]);
 
-  // Fetch shape files for newly-active lines
+  // Fetch shape files for newly-active lines (never re-fetches already-loaded ones)
   useEffect(() => {
     if (manifest.length === 0) return;
 
-    const byName = new Map(manifest.map(e => [e.name, e]));
+    const byName  = new Map(manifest.map(e => [e.name, e]));
     const toFetch = [...activeLineNames].filter(
       name => !fetching.current.has(name) && !loadedShapes.has(name),
     );
@@ -69,9 +73,7 @@ export default function ShapeLayer({ vehicles }: Props) {
           const res = await fetch(`/shapes/${entry.file}`);
           if (!res.ok) return null;
           return [name, await res.json() as ShapeFile] as const;
-        } catch {
-          return null;
-        }
+        } catch { return null; }
       }),
     ).then(results => {
       const fresh = results.filter((r): r is [string, ShapeFile] => r !== null);
@@ -82,7 +84,8 @@ export default function ShapeLayer({ vehicles }: Props) {
         return next;
       });
     });
-  }, [activeLineNames, manifest, loadedShapes]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeLineNames, manifest]); // ← loadedShapes intentionally excluded; fetching ref guards re-fetches
 
   const ROUTE_TYPE_LABELS: Record<number, string> = {
     100: 'Tåg', 700: 'Buss', 900: 'Spårvagn', 1000: 'Båt', 1200: 'Färja',
@@ -90,10 +93,11 @@ export default function ShapeLayer({ vehicles }: Props) {
 
   return (
     <>
-      {[...activeLineNames].map(name => {
+      {[...loadedShapes.keys()].map(name => {
         const shape = loadedShapes.get(name);
         if (!shape || shape.coordinates.length < 2) return null;
-        const color   = lineColors.get(name) ?? '#94a3b8';
+        // Use persistent cache — colour stays even when vehicle leaves the viewport
+        const color = colorCache.current.get(name) ?? '#94a3b8';
         const normal: PathOptions  = { color, weight: 4, opacity: 0.55 };
         const hovered: PathOptions = { color, weight: 7, opacity: 0.85 };
         const typeLabel = ROUTE_TYPE_LABELS[shape.routeType] ?? `Typ ${shape.routeType}`;
