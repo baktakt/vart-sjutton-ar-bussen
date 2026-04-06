@@ -102,7 +102,7 @@ export default function StopLayer() {
   const [stops,    setStops]    = useState<Stop[]>([]);
   const [viewport, setViewport] = useState(0);
   const [zoom,     setZoom]     = useState(map.getZoom());
-  const markers = useRef(new Map<string, L.CircleMarker>());
+  const markers = useRef(new Map<string, L.Marker>());
 
   useMapEvents({
     zoomend: () => { setZoom(map.getZoom()); setViewport(v => v + 1); },
@@ -137,15 +137,17 @@ export default function StopLayer() {
     for (const stop of stops) {
       if (!visible.has(stop.id) || markers.current.has(stop.id)) continue;
 
-      const normalStyle = { radius: 9, color: '#ffffff', weight: 2.5, fillColor: '#334155', fillOpacity: 1 };
-      const hoverStyle  = { radius: 11, fillColor: '#3b82f6', color: '#ffffff', weight: 2.5, fillOpacity: 1 };
+      const icon = L.divIcon({
+        className: '',
+        html: '<div class="stop-marker">H</div>',
+        iconSize:   [22, 22],
+        iconAnchor: [11, 11],
+        tooltipAnchor: [0, -13],
+      });
 
-      const marker = L.circleMarker([stop.lat, stop.lng], normalStyle)
-        .bindTooltip(stop.name, { direction: 'top', offset: [0, -10] })
+      const marker = L.marker([stop.lat, stop.lng], { icon })
+        .bindTooltip(stop.name, { direction: 'top', offset: [0, -4] })
         .addTo(map);
-
-      marker.on('mouseover', () => marker.setStyle(hoverStyle));
-      marker.on('mouseout',  () => marker.setStyle(normalStyle));
 
       // Click → show departure board popup
       marker.on('click', async () => {
