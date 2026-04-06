@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { MapContainer, TileLayer, useMapEvents } from 'react-leaflet';
-import VehicleLayer from '@/components/VehicleLayer';
-import ShapeLayer   from '@/components/ShapeLayer';
-import StopLayer    from '@/components/StopLayer';
+import VehicleLayer          from '@/components/VehicleLayer';
+import ShapeLayer             from '@/components/ShapeLayer';
+import StopLayer              from '@/components/StopLayer';
+import GeolocationController  from '@/components/GeolocationController';
 import FilterBar, { DEFAULT_FILTER, applyFilter } from '@/components/FilterBar';
 import type { FilterState } from '@/components/FilterBar';
 import type { EnrichedVehicle, VehiclesResponse } from '@/types/vasttrafik';
@@ -50,7 +51,9 @@ export default function TransitMap() {
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState<string | null>(null);
   const [filter,    setFilter]    = useState<FilterState>(DEFAULT_FILTER);
-  const boundsRef = useRef<string | null>(null);
+  const [geoError,  setGeoError]  = useState<string | null>(null);
+  const boundsRef   = useRef<string | null>(null);
+  const locateTrigger = useRef<(() => void) | null>(null);
 
   const poll = useCallback(async () => {
     const url = boundsRef.current
@@ -74,6 +77,13 @@ export default function TransitMap() {
     poll();
     const id = setInterval(poll, POLL_MS);
     return () => clearInterval(id);
+  }, [poll]);
+
+  // Called by GeolocationController when a position is found
+  const handleLocation = useCallback((bounds: string) => {
+    boundsRef.current = bounds;
+    setGeoError(null);
+    poll();
   }, [poll]);
 
   // Stage 1: mode filter — shapes follow this
@@ -119,6 +129,14 @@ export default function TransitMap() {
             {noData    > 0 && <DelayBadge count={noData}    label="Okänd" color="#334155" />}
             {loading && <span className="text-blue-400 text-xs">Hämtar…</span>}
             {error   && <span className="text-red-400  text-xs" title={error}>⚠ Fel</span>}
+            {geoError && <span className="text-yellow-400 text-xs" title={geoError}>⚠ Plats</span>}
+            <button
+              onClick={() => locateTrigger.current?.()}
+              title="Hitta min position"
+              className="text-xs px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white leading-none"
+            >
+              Hitta mig
+            </button>
           </div>
         </div>
 
@@ -135,6 +153,11 @@ export default function TransitMap() {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <BoundsTracker boundsRef={boundsRef} />
+        <GeolocationController
+          triggerRef={locateTrigger}
+          onLocation={handleLocation}
+          onError={setGeoError}
+        />
         <ShapeLayer   vehicles={modeFiltered} />
         <StopLayer />
         <VehicleLayer vehicles={displayed} />
