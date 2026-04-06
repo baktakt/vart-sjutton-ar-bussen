@@ -16,11 +16,40 @@ const MIN_ZOOM = 15;
 
 // ---------- departure board HTML ----------
 
-function modeIcon(mode: string): string {
-  if (mode === 'tram')  return '🚋';
-  if (mode === 'train') return '🚆';
-  if (mode === 'ferry') return '⛴';
-  return '🚌';
+// Inline SVG icons — stroke-based, consistent weight, no emoji baseline issues
+const MODE_ICONS: Record<string, string> = {
+  tram: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;">
+    <rect x="4" y="8" width="16" height="10" rx="2"/>
+    <path d="M8 8V5h8v3"/>
+    <path d="M4 13h16"/>
+    <path d="M8 18v2M16 18v2"/>
+    <path d="M12 5V3"/>
+  </svg>`,
+
+  bus: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;">
+    <path d="M4 17h16V8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9z"/>
+    <path d="M4 12h16"/>
+    <path d="M9 6v6M15 6v6"/>
+    <circle cx="7.5" cy="19.5" r="1.5"/>
+    <circle cx="16.5" cy="19.5" r="1.5"/>
+  </svg>`,
+
+  train: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;">
+    <rect x="5" y="3" width="14" height="14" rx="3"/>
+    <path d="M5 10h14"/>
+    <path d="M10 3v7M14 3v7"/>
+    <path d="M8 17l-2 4M16 17l2 4"/>
+  </svg>`,
+
+  ferry: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;">
+    <path d="M3 17h18l-3-9H6L3 17z"/>
+    <path d="M12 8V4M9 4h6"/>
+    <path d="M2 20c2-1 4-1 6 0s4 1 6 0 4-1 6 0"/>
+  </svg>`,
+};
+
+function modeIconSvg(mode: string): string {
+  return MODE_ICONS[mode] ?? MODE_ICONS.bus;
 }
 
 function minsUntil(iso: string): string {
@@ -46,15 +75,15 @@ function boardHtml(stopName: string, deps: VTDeparture[]): string {
     const dir  = group[0].serviceJourney.direction;
     const bg   = line.backgroundColor || '#374151';
     const fg   = line.foregroundColor  || '#ffffff';
-    const icon = modeIcon(line.transportMode);
+    const icon = modeIconSvg(line.transportMode);
     const next  = minsUntil(group[0].estimatedOtherwisePlannedTime);
     const after = group[1] ? minsUntil(group[1].estimatedOtherwisePlannedTime) : '—';
     const cancelled = group[0].isCancelled;
 
     return `
       <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #1e293b;">
-        <div style="background:${bg};color:${fg};border-radius:4px;padding:2px 7px;font-weight:bold;font-size:13px;min-width:28px;text-align:center;white-space:nowrap;${cancelled ? 'opacity:0.45;text-decoration:line-through;' : ''}">${line.shortName || line.name}</div>
-        <span style="font-size:15px;line-height:1;">${icon}</span>
+        <div style="background:${bg};color:${fg};border-radius:4px;padding:2px 7px;font-weight:bold;font-size:13px;min-width:32px;text-align:center;white-space:nowrap;${cancelled ? 'opacity:0.45;text-decoration:line-through;' : ''}">${line.shortName || line.name}</div>
+        <div style="width:18px;height:18px;flex-shrink:0;display:flex;align-items:center;justify-content:center;">${icon}</div>
         <span style="flex:1;font-size:13px;font-weight:600;${cancelled ? 'color:#6b7280;text-decoration:line-through;' : ''}">${dir}</span>
         <span style="font-weight:bold;font-size:17px;min-width:28px;text-align:right;${cancelled ? 'color:#ef4444;' : ''}">${cancelled ? '✕' : next}</span>
         <span style="color:#475569;font-size:12px;min-width:24px;text-align:right;">${cancelled ? '' : after}</span>
