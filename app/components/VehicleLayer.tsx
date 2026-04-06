@@ -98,8 +98,13 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 function moveMarker(marker: L.Marker, lat: number, lng: number): void {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const m = marker as any;
-  m._latlng = L.latLng(lat, lng);
+  const latlng = L.latLng(lat, lng);
+  m._latlng = latlng;
   m.update(); // recalculates screen pos + sets transform, no events
+
+  // Tooltip won't follow because we suppressed the 'move' event —
+  // update it directly so an open tooltip stays anchored to the marker.
+  marker.getTooltip()?.setLatLng(latlng);
 }
 
 // If a vehicle moves more than ~1 km between polls it's a GPS jump — snap instead
