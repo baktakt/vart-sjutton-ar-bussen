@@ -89,6 +89,19 @@ interface AnimState {
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
+/**
+ * Move a marker without firing the Leaflet 'move' event.
+ * setLatLng() fires 'move' which causes MarkerClusterGroup to re-cluster
+ * on every call — at 60 fps this floods the event queue and breaks clicks.
+ * Writing _latlng directly + update() moves the CSS transform only.
+ */
+function moveMarker(marker: L.Marker, lat: number, lng: number): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const m = marker as any;
+  m._latlng = L.latLng(lat, lng);
+  m.update(); // recalculates screen pos + sets transform, no events
+}
+
 // If a vehicle moves more than ~1 km between polls it's a GPS jump — snap instead
 const TELEPORT_DEG = 0.01;
 const POLL_MS      = 15_000;
@@ -137,7 +150,8 @@ export default function VehicleLayer({ vehicles }: Props) {
         // Skip DOM update if movement is sub-pixel
         if (Math.abs(lat - anim.curLat) < MIN_DELTA && Math.abs(lng - anim.curLng) < MIN_DELTA) continue;
 
-        markers.current.get(id)?.setLatLng([lat, lng]);
+        const m = markers.current.get(id);
+        if (m) moveMarker(m, lat, lng);
         anim.curLat = lat;
         anim.curLng = lng;
       }
@@ -164,16 +178,19 @@ export default function VehicleLayer({ vehicles }: Props) {
       }
     }
 
+    const newMarkers: L.Marker[] = [];
+
     for (const v of vehicles) {
       const existing = markers.current.get(v.id);
       const prevAnim = animStates.current.get(v.id);
 
       if (existing) {
-        // Use our cached position as the animation origin (avoids getLatLng() call)
         const fromLat = prevAnim?.curLat ?? v.lat;
         const fromLng = prevAnim?.curLng ?? v.lng;
         const dist    = Math.hypot(v.lat - fromLat, v.lng - fromLng);
         const snap    = dist > TELEPORT_DEG;
+
+        if (snap) moveMarker(existing, v.lat, v.lng);
 
         animStates.current.set(v.id, {
           fromLat: snap ? v.lat : fromLat,
@@ -186,8 +203,7 @@ export default function VehicleLayer({ vehicles }: Props) {
           curLng:  snap ? v.lng : fromLng,
         });
 
-        // Only rebuild the icon if delay / cancelled state has changed.
-        // This prevents the tooltip from flickering on every poll.
+        // Only rebuild icon if visual state changed — avoids tooltip flicker
         const key = iconKey(v);
         if (iconKeys.current.get(v.id) !== key) {
           existing.setIcon(makeIcon(v));
@@ -195,7 +211,7 @@ export default function VehicleLayer({ vehicles }: Props) {
           iconKeys.current.set(v.id, key);
         }
       } else {
-        // First sighting — place immediately
+        // First sighting — place immediately, queue for bulk addLayers
         animStates.current.set(v.id, {
           fromLat: v.lat, fromLng: v.lng,
           toLat:   v.lat, toLng:   v.lng,
@@ -206,10 +222,13 @@ export default function VehicleLayer({ vehicles }: Props) {
 
         const marker = L.marker([v.lat, v.lng], { icon: makeIcon(v) })
           .bindTooltip(tooltipHtml(v), { direction: 'top', offset: [0, -20] });
-        group.addLayer(marker);
         markers.current.set(v.id, marker);
+        newMarkers.push(marker);
       }
     }
+
+    // Bulk-add new markers (single cluster recalculation instead of N)
+    if (newMarkers.length > 0) group.addLayers(newMarkers);
   }, [vehicles]);
 
   // ── Cleanup ────────────────────────────────────────────────────────────────
