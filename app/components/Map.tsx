@@ -6,6 +6,7 @@ import VehicleLayer          from '@/components/VehicleLayer';
 import ShapeLayer             from '@/components/ShapeLayer';
 import StopLayer              from '@/components/StopLayer';
 import GeolocationController  from '@/components/GeolocationController';
+import OneFingerZoom           from '@/components/OneFingerZoom';
 import FilterBar, { DEFAULT_FILTER, applyFilter } from '@/components/FilterBar';
 import type { FilterState } from '@/components/FilterBar';
 import type { EnrichedVehicle, VehiclesResponse } from '@/types/vasttrafik';
@@ -248,6 +249,7 @@ export default function TransitMap() {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+        <OneFingerZoom />
         <BoundsTracker
           boundsRef={boundsRef}
           lastPolledBoundsRef={lastPolledBoundsRef}
