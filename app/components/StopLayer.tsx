@@ -137,11 +137,15 @@ export default function StopLayer() {
     for (const stop of stops) {
       if (!visible.has(stop.id) || markers.current.has(stop.id)) continue;
 
-      const marker = L.circleMarker([stop.lat, stop.lng], {
-        radius: 5, color: '#ffffff', weight: 2, fillColor: '#1e293b', fillOpacity: 0.9,
-      })
-        .bindTooltip(stop.name, { direction: 'top', offset: [0, -6] })
+      const normalStyle = { radius: 9, color: '#ffffff', weight: 2.5, fillColor: '#334155', fillOpacity: 1 };
+      const hoverStyle  = { radius: 11, fillColor: '#3b82f6', color: '#ffffff', weight: 2.5, fillOpacity: 1 };
+
+      const marker = L.circleMarker([stop.lat, stop.lng], normalStyle)
+        .bindTooltip(stop.name, { direction: 'top', offset: [0, -10] })
         .addTo(map);
+
+      marker.on('mouseover', () => marker.setStyle(hoverStyle));
+      marker.on('mouseout',  () => marker.setStyle(normalStyle));
 
       // Click → show departure board popup
       marker.on('click', async () => {
