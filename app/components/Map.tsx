@@ -10,24 +10,15 @@ import FilterBar, { DEFAULT_FILTER, applyFilter } from '@/components/FilterBar';
 import type { FilterState } from '@/components/FilterBar';
 import type { EnrichedVehicle, VehiclesResponse } from '@/types/vasttrafik';
 
+// Need L type for BoundsTracker
+import type L from 'leaflet';
+
 const CENTER: [number, number] = [57.7089, 11.9746];
 const ZOOM    = 13;
 const POLL_MS = 15_000;
 
-// Captures live map bounds; calls onMove when user pans/zooms
-function BoundsTracker({
-  boundsRef,
-  onMove,
-}: {
-  boundsRef: React.MutableRefObject<string | null>;
-  onMove: () => void;
-}) {
-  useMapEvents({
-    moveend: e => { boundsRef.current = toBoundsParam(e.target.getBounds()); onMove(); },
-    zoomend: e => { boundsRef.current = toBoundsParam(e.target.getBounds()); onMove(); },
-  });
-  return null;
-}
+// Minimum movement in degrees before "Sök i området" appears (~800 m)
+const MOVE_THRESHOLD_DEG = 0.007;
 
 function toBoundsParam(b: L.LatLngBounds): string {
   return [
@@ -38,18 +29,82 @@ function toBoundsParam(b: L.LatLngBounds): string {
   ].join(',');
 }
 
-// Need L type for toBoundsParam signature
-import type L from 'leaflet';
+function boundsCenter(boundsStr: string): { lat: number; lng: number } | null {
+  const p = boundsStr.split(',').map(Number);
+  if (p.length !== 4 || p.some(isNaN)) return null;
+  return { lat: (p[0] + p[2]) / 2, lng: (p[1] + p[3]) / 2 };
+}
 
-function DelayBadge({ count, label, color }: { count: number; label: string; color: string }) {
+/**
+ * Captures live map bounds; calls onMove when the user pans far enough
+ * or changes zoom by ≥1 level.
+ */
+function BoundsTracker({
+  boundsRef,
+  lastPolledBoundsRef,
+  onMove,
+}: {
+  boundsRef: React.MutableRefObject<string | null>;
+  lastPolledBoundsRef: React.MutableRefObject<string | null>;
+  onMove: () => void;
+}) {
+  const lastZoomRef = useRef<number | null>(null);
+
+  useMapEvents({
+    moveend: e => {
+      const b    = e.target.getBounds();
+      const str  = toBoundsParam(b);
+      boundsRef.current = str;
+
+      const lastCenter = lastPolledBoundsRef.current
+        ? boundsCenter(lastPolledBoundsRef.current)
+        : null;
+      const newCenter  = b.getCenter();
+
+      if (!lastCenter) { onMove(); return; }
+      const dist = Math.sqrt(
+        (newCenter.lat - lastCenter.lat) ** 2 + (newCenter.lng - lastCenter.lng) ** 2,
+      );
+      if (dist > MOVE_THRESHOLD_DEG) onMove();
+    },
+
+    zoomend: e => {
+      const b   = e.target.getBounds();
+      boundsRef.current = toBoundsParam(b);
+
+      const newZoom = e.target.getZoom();
+      if (lastZoomRef.current !== null && Math.abs(newZoom - lastZoomRef.current) >= 1) {
+        onMove();
+      }
+      lastZoomRef.current = newZoom;
+    },
+  });
+
+  return null;
+}
+
+// ---------- persona-aware header pieces ----------
+
+function LocateIcon() {
   return (
-    <div className="flex items-center gap-1 text-xs">
-      <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: color }} />
-      <span className="text-slate-300">{label}:</span>
-      <span className="font-semibold text-white">{count}</span>
-    </div>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+    </svg>
   );
 }
+
+function SearchIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+    </svg>
+  );
+}
+
+// ---------- main component ----------
 
 export default function TransitMap() {
   const [vehicles,  setVehicles]  = useState<EnrichedVehicle[]>([]);
@@ -59,8 +114,22 @@ export default function TransitMap() {
   const [filter,    setFilter]    = useState<FilterState>(DEFAULT_FILTER);
   const [geoError,  setGeoError]  = useState<string | null>(null);
   const [mapDirty,  setMapDirty]  = useState(false);
-  const boundsRef    = useRef<string | null>(null);
-  const locateTrigger = useRef<(() => void) | null>(null);
+  const [headerH,   setHeaderH]   = useState(72);
+
+  const boundsRef          = useRef<string | null>(null);
+  const lastPolledBoundsRef = useRef<string | null>(null);
+  const locateTrigger       = useRef<(() => void) | null>(null);
+  const headerRef           = useRef<HTMLDivElement>(null);
+
+  // Track actual header height for the "Sök i området" button position
+  useEffect(() => {
+    const measure = () => {
+      if (headerRef.current) setHeaderH(headerRef.current.offsetHeight);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
 
   const poll = useCallback(async () => {
     const url = boundsRef.current
@@ -74,6 +143,7 @@ export default function TransitMap() {
       setFetchedAt(data.fetchedAt);
       setError(null);
       setMapDirty(false);
+      lastPolledBoundsRef.current = boundsRef.current; // mark where we polled
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -87,7 +157,6 @@ export default function TransitMap() {
     return () => clearInterval(id);
   }, [poll]);
 
-  // Called by GeolocationController when a position is found
   const handleLocation = useCallback((bounds: string) => {
     boundsRef.current = bounds;
     setGeoError(null);
@@ -106,46 +175,49 @@ export default function TransitMap() {
     [modeFiltered, filter],
   );
 
-  const late      = displayed.filter(v => (v.delayMinutes ?? 0) > 1  && !v.isCancelled).length;
-  const early     = displayed.filter(v => (v.delayMinutes ?? 0) < -1 && !v.isCancelled).length;
-  const onTime    = displayed.filter(v => v.delayMinutes !== null && Math.abs(v.delayMinutes) <= 1 && !v.isCancelled).length;
-  const cancelled = displayed.filter(v => v.isCancelled).length;
-  const noData    = displayed.filter(v => v.delayMinutes === null && !v.isCancelled).length;
+  const lateCount = displayed.filter(v => (v.delayMinutes ?? 0) > 1 && !v.isCancelled).length;
+
+  const updatedLabel = fetchedAt
+    ? new Date(fetchedAt).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
+    : null;
 
   return (
     <div className="relative w-full h-full">
-      {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-[1000]
+
+      {/* ── Header ── */}
+      <div ref={headerRef}
+           className="absolute top-0 left-0 right-0 z-[1000]
                       bg-slate-900/90 backdrop-blur border-b border-slate-700">
 
-        {/* Row 1: title + delay stats */}
-        <div className="flex items-center gap-4 px-4 pt-2 pb-1.5">
-          <div>
-            <h1 className="text-white font-bold text-sm leading-none">Västtrafik — realtid</h1>
-            {fetchedAt && (
-              <p className="text-slate-500 text-xs mt-0.5">
-                {new Date(fetchedAt).toLocaleTimeString('sv-SE')}
-                {' · '}uppdateras var 15s
-              </p>
-            )}
+        {/* Row 1: title + locate button */}
+        <div className="flex items-center gap-3 px-4 pt-2.5 pb-1.5">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-white font-bold text-base leading-none">Västtrafik live</h1>
+            <p className="text-slate-400 text-xs mt-1 truncate">
+              {loading
+                ? 'Hämtar…'
+                : `${displayed.length} fordon i området`}
+              {lateCount > 0 && (
+                <span className="text-red-400"> · {lateCount} sena</span>
+              )}
+              {updatedLabel && (
+                <span className="text-slate-500"> · kl {updatedLabel}</span>
+              )}
+              {error && <span className="text-red-400"> · ⚠ fel</span>}
+            </p>
           </div>
-          <div className="flex gap-3 ml-auto flex-wrap items-center">
-            <DelayBadge count={late}      label="Sena"   color="#ef4444" />
-            <DelayBadge count={early}     label="Tidiga" color="#22c55e" />
-            <DelayBadge count={onTime}    label="I tid"  color="#64748b" />
-            {cancelled > 0 && <DelayBadge count={cancelled} label="Inst."  color="#6b7280" />}
-            {noData    > 0 && <DelayBadge count={noData}    label="Okänd" color="#334155" />}
-            {loading && <span className="text-blue-400 text-xs">Hämtar…</span>}
-            {error   && <span className="text-red-400  text-xs" title={error}>⚠ Fel</span>}
-            {geoError && <span className="text-yellow-400 text-xs" title={geoError}>⚠ Plats</span>}
-            <button
-              onClick={() => locateTrigger.current?.()}
-              title="Hitta min position"
-              className="text-xs px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white leading-none"
-            >
-              Hitta mig
-            </button>
-          </div>
+
+          <button
+            onClick={() => locateTrigger.current?.()}
+            title={geoError ?? 'Hitta min position'}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold flex-shrink-0
+                        ${geoError
+                          ? 'bg-yellow-600 hover:bg-yellow-500 text-white'
+                          : 'bg-blue-600 hover:bg-blue-500 text-white'}`}
+          >
+            <LocateIcon />
+            Hitta mig
+          </button>
         </div>
 
         {/* Row 2: filter bar */}
@@ -154,30 +226,33 @@ export default function TransitMap() {
         </div>
       </div>
 
-      {/* "Sök i området" pill — appears after panning/zooming */}
+      {/* ── "Sök i området" pill ── */}
       {mapDirty && !loading && (
-        <div className="absolute z-[999] left-1/2 -translate-x-1/2" style={{ top: 96 }}>
+        <div className="absolute z-[999] left-1/2 -translate-x-1/2 pointer-events-none"
+             style={{ top: headerH + 10 }}>
           <button
             onClick={() => { setMapDirty(false); poll(); }}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white text-slate-800
-                       font-semibold text-sm shadow-lg hover:bg-slate-50 active:scale-95
-                       transition-transform"
+            className="pointer-events-auto flex items-center gap-1.5 px-4 py-2 rounded-full
+                       bg-white text-slate-800 font-semibold text-sm shadow-lg
+                       hover:bg-slate-50 active:scale-95 transition-transform"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-            </svg>
+            <SearchIcon />
             Sök i området
           </button>
         </div>
       )}
 
-      {/* Map */}
+      {/* ── Map ── */}
       <MapContainer center={CENTER} zoom={ZOOM} className="w-full h-full" zoomControl={false}>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <BoundsTracker boundsRef={boundsRef} onMove={() => setMapDirty(true)} />
+        <BoundsTracker
+          boundsRef={boundsRef}
+          lastPolledBoundsRef={lastPolledBoundsRef}
+          onMove={() => setMapDirty(true)}
+        />
         <GeolocationController
           triggerRef={locateTrigger}
           onLocation={handleLocation}

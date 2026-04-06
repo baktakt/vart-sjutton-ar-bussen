@@ -63,9 +63,10 @@ function boardHtml(stopName: string, deps: VTDeparture[]): string {
 
   return `
     <div style="font-family:Arial,Helvetica,sans-serif;background:#0f172a;color:#f8fafc;border-radius:10px;overflow:hidden;min-width:300px;max-width:340px;">
-      <div style="background:#1e293b;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-weight:bold;font-size:15px;">${stopName}</span>
-        <span style="font-size:15px;font-weight:bold;color:#94a3b8;">${now}</span>
+      <div style="background:#1e293b;padding:10px 14px;display:flex;align-items:center;gap:8px;">
+        <span style="font-weight:bold;font-size:15px;flex:1;">${stopName}</span>
+        <span style="font-size:14px;font-weight:bold;color:#94a3b8;margin-right:6px;">${now}</span>
+        <button class="popup-close-btn" style="background:#334155;border:none;color:#94a3b8;border-radius:50%;width:22px;height:22px;font-size:16px;line-height:22px;text-align:center;cursor:pointer;flex-shrink:0;padding:0;" title="Stäng">×</button>
       </div>
       <div style="display:grid;grid-template-columns:1fr auto auto;gap:0 8px;color:#475569;font-size:10px;padding:5px 14px 2px;border-bottom:1px solid #1e293b;">
         <span></span><span>Nästa</span><span>Därefter</span>
@@ -144,18 +145,26 @@ export default function StopLayer() {
 
       // Click → show departure board popup
       marker.on('click', async () => {
-        const popup = L.popup({ maxWidth: 360, className: 'stop-popup' })
+        const popup = L.popup({ maxWidth: 360, className: 'stop-popup', closeButton: false })
           .setLatLng([stop.lat, stop.lng])
-          .setContent(loadingHtml(stop.name))
-          .openOn(map);
+          .setContent(loadingHtml(stop.name));
+
+        // Attach custom close button handler once popup DOM is ready
+        const wireClose = () => {
+          popup.getElement()
+            ?.querySelector('.popup-close-btn')
+            ?.addEventListener('click', () => map.closePopup(popup));
+        };
+        popup.on('add', wireClose);
+        popup.openOn(map);
 
         try {
           const res  = await fetch(`/api/departures?gid=${stop.id}`, { cache: 'no-store' });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const data = await res.json();
-          // Popup may have been closed; only update if still open
           if (map.hasLayer(popup as unknown as L.Layer)) {
             popup.setContent(boardHtml(stop.name, data.departures ?? []));
+            wireClose();
           }
         } catch {
           if (map.hasLayer(popup as unknown as L.Layer)) {
