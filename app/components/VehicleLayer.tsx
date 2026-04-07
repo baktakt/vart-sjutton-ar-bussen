@@ -136,7 +136,10 @@ export default function VehicleLayer({ vehicles }: Props) {
     });
     map.addLayer(group);
     cluster.current = group;
-    return () => { map.removeLayer(group); };
+    return () => {
+      map.removeLayer(group);
+      cluster.current = null; // prevent stale ref: removeLayer clears _zoom, addLayers would throw
+    };
   }, [map]);
 
   // ── 60 fps RAF loop ────────────────────────────────────────────────────────
@@ -170,7 +173,11 @@ export default function VehicleLayer({ vehicles }: Props) {
   // ── Diff incoming vehicles ─────────────────────────────────────────────────
   useEffect(() => {
     const group = cluster.current;
-    if (!group) return;
+    // Guard: if the group has been removed from the map its internal state is
+    // torn down. addLayers would throw "Cannot read properties of undefined
+    // (reading '_zoom')". Check _map which is cleared on removeLayer.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (!group || !(group as any)._map) return;
 
     const now      = Date.now();
     const incoming = new Map(vehicles.map(v => [v.id, v]));
@@ -235,7 +242,14 @@ export default function VehicleLayer({ vehicles }: Props) {
     }
 
     // Bulk-add new markers (single cluster recalculation instead of N)
-    if (newMarkers.length > 0) group.addLayers(newMarkers);
+    if (newMarkers.length > 0) {
+      try {
+        group.addLayers(newMarkers);
+      } catch (err) {
+        console.warn('[VehicleLayer] addLayers failed, falling back to addLayer:', err);
+        newMarkers.forEach(m => { try { group.addLayer(m); } catch {} });
+      }
+    }
   }, [vehicles]);
 
   // ── Cleanup ────────────────────────────────────────────────────────────────
