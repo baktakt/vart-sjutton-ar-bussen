@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getCity }         from '@/lib/providers';
 import { getToken }        from '@/lib/vasttrafik/token';
 import { fetchDepartures } from '@/lib/vasttrafik/departures';
 
-export const dynamic    = 'force-dynamic';
+export const dynamic     = 'force-dynamic';
 export const maxDuration = 15;
 
-export async function GET(req: NextRequest) {
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ city: string }> },
+) {
+  const { city: cityId } = await params;
+  const city = getCity(cityId);
+  if (!city) {
+    return NextResponse.json({ error: `Unknown city: ${cityId}` }, { status: 404 });
+  }
+
   const gid = req.nextUrl.searchParams.get('gid');
   if (!gid) {
     return NextResponse.json({ error: 'gid is required' }, { status: 400 });
@@ -15,7 +25,6 @@ export async function GET(req: NextRequest) {
     const token      = await getToken();
     const departures = await fetchDepartures(token, gid, 20);
 
-    // Sort by actual departure time
     departures.sort(
       (a, b) =>
         new Date(a.estimatedOtherwisePlannedTime).getTime() -

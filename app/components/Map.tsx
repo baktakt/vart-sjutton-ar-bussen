@@ -10,12 +10,11 @@ import OneFingerZoom           from '@/components/OneFingerZoom';
 import FilterBar, { DEFAULT_FILTER, applyFilter } from '@/components/FilterBar';
 import type { FilterState } from '@/components/FilterBar';
 import type { EnrichedVehicle, VehiclesResponse } from '@/types/vasttrafik';
+import type { CityConfig } from '@/lib/providers';
 
 // Need L type for BoundsTracker
 import type L from 'leaflet';
 
-const CENTER: [number, number] = [57.7089, 11.9746];
-const ZOOM    = 13;
 const POLL_MS = 15_000;
 
 // Minimum movement in degrees before "Sök i området" appears (~800 m)
@@ -107,7 +106,7 @@ function SearchIcon() {
 
 // ---------- main component ----------
 
-export default function TransitMap() {
+export default function TransitMap({ city }: { city: CityConfig }) {
   const [vehicles,  setVehicles]  = useState<EnrichedVehicle[]>([]);
   const [fetchedAt, setFetchedAt] = useState<string | null>(null);
   const [loading,   setLoading]   = useState(true);
@@ -134,8 +133,8 @@ export default function TransitMap() {
 
   const poll = useCallback(async () => {
     const url = boundsRef.current
-      ? `/api/vehicles?bounds=${boundsRef.current}`
-      : '/api/vehicles';
+      ? `/api/${city.id}/vehicles?bounds=${boundsRef.current}`
+      : `/api/${city.id}/vehicles`;
     try {
       const res  = await fetch(url, { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -193,7 +192,7 @@ export default function TransitMap() {
         {/* Row 1: title + locate button */}
         <div className="flex items-center gap-3 px-4 pt-2.5 pb-1.5">
           <div className="flex-1 min-w-0">
-            <h1 className="text-white font-bold text-base leading-none">Västtrafik live</h1>
+            <h1 className="text-white font-bold text-base leading-none">{city.name} live</h1>
             <p className="text-slate-400 text-xs mt-1 truncate">
               {loading
                 ? 'Hämtar…'
@@ -244,7 +243,7 @@ export default function TransitMap() {
       )}
 
       {/* ── Map ── */}
-      <MapContainer center={CENTER} zoom={ZOOM} className="w-full h-full" zoomControl={false}>
+      <MapContainer center={city.defaultCenter} zoom={city.defaultZoom} className="w-full h-full" zoomControl={false}>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -260,8 +259,8 @@ export default function TransitMap() {
           onLocation={handleLocation}
           onError={setGeoError}
         />
-        <ShapeLayer   vehicles={modeFiltered} />
-        <StopLayer />
+        <ShapeLayer vehicles={modeFiltered} shapesPath={city.shapesPath} />
+        <StopLayer shapesPath={city.shapesPath} cityId={city.id} />
         <VehicleLayer vehicles={displayed} />
       </MapContainer>
     </div>

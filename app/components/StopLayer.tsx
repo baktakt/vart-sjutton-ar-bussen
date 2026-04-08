@@ -129,7 +129,7 @@ function errorHtml(stopName: string): string {
 
 // ---------- component ----------
 
-export default function StopLayer() {
+export default function StopLayer({ shapesPath, cityId }: { shapesPath: string; cityId: string }) {
   const map     = useMap();
   const [stops,    setStops]    = useState<Stop[]>([]);
   const [viewport, setViewport] = useState(0);
@@ -142,11 +142,11 @@ export default function StopLayer() {
   });
 
   useEffect(() => {
-    fetch('/shapes/stops.json')
+    fetch(`${shapesPath}/stops.json`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.stops) setStops(d.stops); })
       .catch(() => {});
-  }, []);
+  }, [shapesPath]);
 
   useEffect(() => {
     if (zoom < MIN_ZOOM || stops.length === 0) {
@@ -197,7 +197,7 @@ export default function StopLayer() {
         popup.openOn(map);
 
         try {
-          const res  = await fetch(`/api/departures?gid=${stop.id}`, { cache: 'no-store' });
+          const res  = await fetch(`/api/${cityId}/departures?gid=${stop.id}`, { cache: 'no-store' });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const data = await res.json();
           if (map.hasLayer(popup as unknown as L.Layer)) {

@@ -19,6 +19,7 @@ interface ManifestEntry {
 
 interface Props {
   vehicles: EnrichedVehicle[];
+  shapesPath: string;
 }
 
 // Fallback colours by GTFS route type (shown before vehicle data arrives)
@@ -34,7 +35,7 @@ const ROUTE_TYPE_LABELS: Record<number, string> = {
   100: 'Tåg', 700: 'Buss', 900: 'Spårvagn', 1000: 'Båt', 1200: 'Färja',
 };
 
-export default function ShapeLayer({ vehicles }: Props) {
+export default function ShapeLayer({ vehicles, shapesPath }: Props) {
   const [manifest,     setManifest]     = useState<ManifestEntry[]>([]);
   const [loadedShapes, setLoadedShapes] = useState<Map<string, ShapeFile>>(new Map());
   const fetching   = useRef(new Set<string>());
@@ -43,11 +44,11 @@ export default function ShapeLayer({ vehicles }: Props) {
 
   // ── Load manifest once ──────────────────────────────────────────────────────
   useEffect(() => {
-    fetch('/shapes/manifest.json')
+    fetch(`${shapesPath}/manifest.json`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.lines) setManifest(d.lines); })
       .catch(() => {});
-  }, []);
+  }, [shapesPath]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Fetch helper ────────────────────────────────────────────────────────────
   function fetchShapes(entries: ManifestEntry[]) {
@@ -58,7 +59,7 @@ export default function ShapeLayer({ vehicles }: Props) {
     Promise.all(
       toFetch.map(async entry => {
         try {
-          const res = await fetch(`/shapes/${entry.file}`);
+          const res = await fetch(`${shapesPath}/${entry.file}`);
           if (!res.ok) return null;
           return [entry.name, await res.json() as ShapeFile] as const;
         } catch { return null; }

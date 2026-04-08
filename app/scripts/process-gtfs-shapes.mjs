@@ -2,11 +2,11 @@
 /**
  * scripts/process-gtfs-shapes.mjs
  *
- * Downloads the Västtrafik GTFS static feed, extracts per-line shape files
- * to public/shapes/, and writes a manifest.json.
+ * Downloads a city's GTFS static feed, extracts per-line shape files
+ * to public/shapes/{city}/, and writes a manifest.json.
  *
- * Run manually whenever Västtrafik publishes a new GTFS feed (~quarterly):
- *   node scripts/process-gtfs-shapes.mjs
+ * Run manually whenever a city publishes a new GTFS feed (~quarterly):
+ *   node scripts/process-gtfs-shapes.mjs --city goteborg
  *
  * Requires TRAFIKLAB_STATIC_KEY in .env.local
  */
@@ -18,7 +18,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const OUT_DIR   = path.resolve(__dirname, '..', 'public', 'shapes');
+
+// Parse --city argument (default: goteborg for backwards compat)
+const cityArg = process.argv.find((a, i) => process.argv[i - 1] === '--city') ?? 'goteborg';
+const CITY_ID = cityArg;
+
+const OUT_DIR = path.resolve(__dirname, '..', 'public', 'shapes', CITY_ID);
+console.log(`Building shapes for city: ${CITY_ID} → ${OUT_DIR}`);
 
 const ROUTE_TYPE_LABELS = {
   100:  'Train',

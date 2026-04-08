@@ -10,7 +10,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "process-shapes": "node scripts/process-gtfs-shapes.mjs"
+    "process-shapes": "node scripts/process-gtfs-shapes.mjs --city goteborg",
+    "process-shapes:all": "npm run process-shapes"
   },
   "dependencies": {
     "@types/leaflet": "^1.9.21",
