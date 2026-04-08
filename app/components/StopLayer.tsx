@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
-import type { VTDeparture } from '@/types/vasttrafik';
+import type { NormalizedDeparture } from '@/types/transit';
 
 interface Stop {
   id: string;
@@ -57,13 +57,13 @@ function minsUntil(iso: string): string {
   return diff <= 0 ? 'Nu' : String(diff);
 }
 
-function boardHtml(stopName: string, deps: VTDeparture[]): string {
+function boardHtml(stopName: string, deps: NormalizedDeparture[]): string {
   const now = new Date().toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
 
-  // Group by line shortName + direction; keep sorted order (deps already sorted by time)
-  const groups = new Map<string, VTDeparture[]>();
+  // Group by line name + direction; keep sorted order (deps already sorted by time)
+  const groups = new Map<string, NormalizedDeparture[]>();
   for (const d of deps) {
-    const key = `${d.serviceJourney.line.shortName}|${d.serviceJourney.direction}`;
+    const key = `${d.line.name}|${d.direction}`;
     const arr  = groups.get(key) ?? [];
     arr.push(d);
     groups.set(key, arr);
@@ -71,12 +71,12 @@ function boardHtml(stopName: string, deps: VTDeparture[]): string {
 
   // Take up to 7 groups, show next departure per group
   const rows = [...groups.values()].slice(0, 7).map(group => {
-    const line     = group[0].serviceJourney.line;
-    const dir      = group[0].serviceJourney.direction;
-    const bg       = line.backgroundColor || '#374151';
-    const fg       = line.foregroundColor  || '#ffffff';
+    const line     = group[0].line;
+    const dir      = group[0].direction;
+    const bg       = line.bgColor || '#374151';
+    const fg       = line.fgColor || '#ffffff';
     const next     = minsUntil(group[0].estimatedOtherwisePlannedTime);
-    const platform = group[0].stopPoint?.platform ?? '';
+    const platform = group[0].platform ?? '';
     const cancelled = group[0].isCancelled;
 
     const platBadge = platform
@@ -85,7 +85,7 @@ function boardHtml(stopName: string, deps: VTDeparture[]): string {
 
     return `
       <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #1e293b;">
-        <div style="background:${bg};color:${fg};border-radius:4px;padding:3px 7px;font-weight:bold;font-size:13px;min-width:32px;text-align:center;white-space:nowrap;${cancelled ? 'opacity:0.45;text-decoration:line-through;' : ''}">${line.shortName || line.name}</div>
+        <div style="background:${bg};color:${fg};border-radius:4px;padding:3px 7px;font-weight:bold;font-size:13px;min-width:32px;text-align:center;white-space:nowrap;${cancelled ? 'opacity:0.45;text-decoration:line-through;' : ''}">${line.name}</div>
         <span style="flex:1;font-size:14px;font-weight:600;${cancelled ? 'color:#6b7280;text-decoration:line-through;' : ''}">${dir}</span>
         <span style="font-weight:bold;font-size:18px;min-width:32px;text-align:right;${cancelled ? 'color:#ef4444;' : ''}">${cancelled ? '✕' : next}</span>
         ${platBadge}

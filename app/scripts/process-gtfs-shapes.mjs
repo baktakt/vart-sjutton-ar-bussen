@@ -26,6 +26,12 @@ const CITY_ID = cityArg;
 const OUT_DIR = path.resolve(__dirname, '..', 'public', 'shapes', CITY_ID);
 console.log(`Building shapes for city: ${CITY_ID} → ${OUT_DIR}`);
 
+// GTFS static feed URLs per city (Trafiklab opendata.samtrafiken.se)
+const GTFS_URLS = {
+  goteborg:  (key) => `https://opendata.samtrafiken.se/gtfs/vt/vt.zip?key=${key}`,
+  stockholm: (key) => `https://opendata.samtrafiken.se/gtfs/sl/sl.zip?key=${key}`,
+};
+
 const ROUTE_TYPE_LABELS = {
   100:  'Train',
   700:  'Bus',
@@ -85,9 +91,15 @@ async function main() {
     process.exit(1);
   }
 
+  const urlFn = GTFS_URLS[CITY_ID];
+  if (!urlFn) {
+    console.error(`ERROR: Unknown city "${CITY_ID}". Known cities: ${Object.keys(GTFS_URLS).join(', ')}`);
+    process.exit(1);
+  }
+
   // 1. Download zip
-  const url = `https://opendata.samtrafiken.se/gtfs/vt/vt.zip?key=${key}`;
-  console.log('Downloading vt.zip…');
+  const url = urlFn(key);
+  console.log(`Downloading ${CITY_ID} GTFS…`);
   const res = await fetch(url);
   if (!res.ok) { console.error(`HTTP ${res.status}`); process.exit(1); }
   const buf = Buffer.from(await res.arrayBuffer());
@@ -100,7 +112,7 @@ async function main() {
   const routesBuf = zip.getEntry('routes.txt').getData();
   const routes     = parseFull(routesBuf);
 
-  // Map: route_id → { name, routeType }
+  // Map: route_id → { name, routeType, color, textColor }
   const routeMeta = new Map();
   for (const r of routes) {
     const type = Number(r.route_type);
@@ -108,9 +120,23 @@ async function main() {
     routeMeta.set(r.route_id, {
       name:      r.route_short_name || r.route_long_name || r.route_id,
       routeType: type,
+      color:     r.route_color     || '',
+      textColor: r.route_text_color || '',
     });
   }
   console.log(`  ${routeMeta.size} routes (skipped ${routes.length - routeMeta.size} demand-responsive)`);
+
+  // Write routes.json — used by lib/sl/routes.ts for vehicle colour lookup
+  fs.mkdirSync(OUT_DIR, { recursive: true });
+  const routesJson = {};
+  for (const [id, { name, routeType, color, textColor }] of routeMeta) {
+    routesJson[id] = { name, type: routeType, color, textColor };
+  }
+  fs.writeFileSync(
+    path.join(OUT_DIR, 'routes.json'),
+    JSON.stringify({ generatedAt: new Date().toISOString(), routes: routesJson }),
+  );
+  console.log(`  routes.json written (${routeMeta.size} entries)`);
 
   // 3. Parse trips.txt → collect shape_ids per route, tracking point count
   //    We need both: wanted shape_ids, and which route each belongs to.
@@ -169,8 +195,6 @@ async function main() {
 
   // 5. For each route, pick the longest shape (most points = most complete)
   //    and write to public/shapes/line-{name}.json
-  fs.mkdirSync(OUT_DIR, { recursive: true });
-
   const manifest = [];
   let written = 0, skipped = 0;
 
@@ -260,7 +284,7 @@ async function main() {
     path.join(OUT_DIR, 'stops.json'),
     JSON.stringify({ generatedAt: new Date().toISOString(), stops: stopList }),
   );
-  console.log(`  ${stopList.length} stops written to public/shapes/stops.json`);
+  console.log(`  ${stopList.length} stops written to public/shapes/${CITY_ID}/stops.json`);
 }
 
 main().catch(err => { console.error('FATAL:', err.message); process.exit(1); });

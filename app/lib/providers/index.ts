@@ -1,4 +1,5 @@
-import goteborg from './goteborg';
+import goteborg  from './goteborg';
+import stockholm from './stockholm';
 import type { CityConfig } from './types';
 
 export type { CityConfig };
@@ -6,7 +7,7 @@ export type { BBox } from './types';
 
 const CITIES: Record<string, CityConfig> = {
   goteborg,
-  // stockholm: stockholm,  ← add here when ready
+  stockholm,
 };
 
 export function getCity(id: string): CityConfig | null {

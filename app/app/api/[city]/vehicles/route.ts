@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCity }             from '@/lib/providers';
 import { getEnrichedVehicles } from '@/lib/pipeline';
+import { getSlVehicles }       from '@/lib/sl/pipeline';
 import type { BBox }           from '@/lib/providers';
 
 export const dynamic     = 'force-dynamic';
@@ -26,8 +27,11 @@ export async function GET(
   }
 
   try {
-    // Use city's default bounds when no viewport bbox is given
-    const data = await getEnrichedVehicles(bbox ?? city.defaultBounds);
+    const effectiveBbox = bbox ?? city.defaultBounds;
+    const data = cityId === 'stockholm'
+      ? await getSlVehicles(effectiveBbox)
+      : await getEnrichedVehicles(effectiveBbox);
+
     return NextResponse.json(data, { headers: { 'Cache-Control': 'no-store' } });
   } catch (err) {
     console.error(`[/api/${cityId}/vehicles]`, err);
