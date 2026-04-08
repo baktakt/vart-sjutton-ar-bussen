@@ -2,7 +2,7 @@
 
 import type { EnrichedVehicle } from '@/types/vasttrafik';
 
-export type FilterMode = 'all' | 'tram' | 'bus' | 'train' | 'boat';
+export type FilterMode = 'all' | 'tram' | 'bus' | 'train' | 'metro' | 'boat';
 
 export interface FilterState {
   mode: FilterMode;
@@ -12,11 +12,12 @@ export interface FilterState {
 export const DEFAULT_FILTER: FilterState = { mode: 'all', onlyLate: false };
 
 const MODES: { key: FilterMode; label: string; types: string[] }[] = [
-  { key: 'all',   label: 'Alla',      types: [] },
-  { key: 'tram',  label: 'Spårvagn',  types: ['tram'] },
-  { key: 'bus',   label: 'Buss',      types: ['bus'] },
-  { key: 'train', label: 'Tåg',       types: ['train'] },
-  { key: 'boat',  label: 'Båt',       types: ['ferry'] },
+  { key: 'all',   label: 'Alla',        types: [] },
+  { key: 'metro', label: 'Tunnelbana',  types: ['metro'] },
+  { key: 'tram',  label: 'Spårvagn',   types: ['tram'] },
+  { key: 'bus',   label: 'Buss',        types: ['bus'] },
+  { key: 'train', label: 'Tåg',         types: ['train'] },
+  { key: 'boat',  label: 'Båt',         types: ['ferry'] },
 ];
 
 export function applyFilter(vehicles: EnrichedVehicle[], filter: FilterState): EnrichedVehicle[] {

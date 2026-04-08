@@ -10,6 +10,8 @@ interface Stop {
   name: string;
   lat: number;
   lng: number;
+  markerLabel?: string;   // 'T' for metro/tunnelbana, 'H' for regular (default)
+  childIds?: string[];    // child stop IDs (quay level) — used server-side for departures
 }
 
 const MIN_ZOOM = 15;
@@ -169,9 +171,10 @@ export default function StopLayer({ shapesPath, cityId }: { shapesPath: string; 
     for (const stop of stops) {
       if (!visible.has(stop.id) || markers.current.has(stop.id)) continue;
 
+      const label = stop.markerLabel ?? 'H';
       const icon = L.divIcon({
         className: '',
-        html: '<div class="stop-marker">H</div>',
+        html: `<div class="stop-marker${label === 'T' ? ' stop-marker--metro' : ''}">${label}</div>`,
         iconSize:   [22, 22],
         iconAnchor: [11, 11],
         tooltipAnchor: [0, -13],

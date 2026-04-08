@@ -9,9 +9,10 @@
  *  4. Return sorted NormalizedDeparture[]
  */
 
-import { getTripUpdateFeed }            from './feed';
-import { getRoutes, ROUTE_TYPE_MODE }   from './routes';
-import type { NormalizedDeparture }     from '@/types/transit';
+import { getTripUpdateFeed }          from './feed';
+import { getRoutes, ROUTE_TYPE_MODE } from './routes';
+import { getChildIds }                from './stop-lookup';
+import type { NormalizedDeparture }   from '@/types/transit';
 
 const MAX_RESULTS   = 20;
 const WINDOW_MS     = 60 * 60 * 1000; // look 60 min ahead
@@ -26,8 +27,13 @@ function toNumber(v: unknown): number {
 }
 
 export async function getSlDepartures(stopId: string): Promise<NormalizedDeparture[]> {
-  const feed   = await getTripUpdateFeed();
-  const routes = getRoutes();
+  const feed    = await getTripUpdateFeed();
+  const routes  = getRoutes();
+
+  // TripUpdates reference child stop IDs (quay/platform level).
+  // The map marker uses the parent station ID from stops.json.
+  // Build a set of all IDs to match: parent + its children.
+  const matchIds = new Set<string>([stopId, ...getChildIds(stopId)]);
 
   const now       = Date.now();
   const cutoff    = now + WINDOW_MS;
@@ -42,7 +48,7 @@ export async function getSlDepartures(stopId: string): Promise<NormalizedDepartu
     const route   = routes.get(routeId);
 
     for (const stu of tu.stopTimeUpdate ?? []) {
-      if (stu.stopId !== stopId) continue;
+      if (!stu.stopId || !matchIds.has(stu.stopId)) continue;
 
       // departure.time is estimated Unix timestamp (seconds)
       const depTime = stu.departure?.time != null

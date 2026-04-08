@@ -62,6 +62,13 @@ html, body {
   background: #3b82f6;
   transform: scale(1.25);
 }
+.stop-marker--metro {
+  background: #185AA1;
+  border-color: #ffffff;
+}
+.stop-marker--metro:hover {
+  background: #1e40af;
+}
 
 /* Pulsing "you are here" dot */
 .user-location-dot {

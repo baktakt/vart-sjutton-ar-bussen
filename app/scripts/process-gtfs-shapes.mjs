@@ -34,11 +34,16 @@ const GTFS_URLS = {
 
 const ROUTE_TYPE_LABELS = {
   100:  'Train',
+  400:  'Metro',
+  401:  'Metro',
   700:  'Bus',
   900:  'Tram',
   1000: 'Boat',
   1200: 'Ferry',
 };
+
+// Metro route types (used to detect metro-served stops)
+const METRO_TYPES = new Set([400, 401]);
 
 // Demand-responsive / flex services — no fixed shape
 const SKIP_TYPES = new Set([1501]);
@@ -148,8 +153,14 @@ async function main() {
   const shapeRoutes   = new Map(); // shape_id → route_id
   const routeShapeIds = new Map(); // route_id → Set<shape_id>
 
+  // Build metro trip set for stop detection later
+  const metroTripIds = new Set();
+
   for (const t of trips) {
-    if (!t.shape_id || !routeMeta.has(t.route_id)) continue;
+    const meta = routeMeta.get(t.route_id);
+    if (!meta) continue;
+    if (METRO_TYPES.has(meta.routeType)) metroTripIds.add(t.trip_id);
+    if (!t.shape_id) continue;
     shapeRoutes.set(t.shape_id, t.route_id);
     if (!routeShapeIds.has(t.route_id)) routeShapeIds.set(t.route_id, new Set());
     routeShapeIds.get(t.route_id).add(t.shape_id);
@@ -157,6 +168,7 @@ async function main() {
 
   const wantedShapeIds = new Set(shapeRoutes.keys());
   console.log(`  ${wantedShapeIds.size} unique shape_ids across ${routeShapeIds.size} routes`);
+  console.log(`  ${metroTripIds.size} metro trip IDs`);
 
   // 4. Stream shapes.txt — only materialise wanted shapes
   console.log('Parsing shapes.txt (streaming)…');
@@ -252,7 +264,29 @@ async function main() {
     console.log(`  ${label}: ${count}`);
   }
 
+  // 5.5 Stream stop_times.txt → find child stop IDs served by metro routes
+  //     (only run if there are metro trips — skipped for Göteborg which has none)
+  const metroChildStopIds = new Set();
+  if (metroTripIds.size > 0) {
+    const stEntry = zip.getEntry('stop_times.txt');
+    if (stEntry) {
+      console.log('\nStreaming stop_times.txt for metro stop detection…');
+      const stBuf  = stEntry.getData();
+      const stGen  = iterLines(stBuf);
+      const stHdrs = parseHeaders(stGen.next().value);
+      const iTripId = stHdrs.indexOf('trip_id');
+      const iStId   = stHdrs.indexOf('stop_id');
+      for (const line of stGen) {
+        const cols = line.split(',');
+        const tid  = cols[iTripId]?.trim();
+        if (metroTripIds.has(tid)) metroChildStopIds.add(cols[iStId]?.trim());
+      }
+      console.log(`  ${metroChildStopIds.size} unique child stop IDs served by metro`);
+    }
+  }
+
   // 6. Parse stops.txt → write stops.json (all stop areas for the map)
+  //    Includes childIds (for departure lookup) and markerLabel ('T' or 'H')
   console.log('\nParsing stops.txt…');
   const stopsBuf  = zip.getEntry('stops.txt').getData();
   const stopsGen  = iterLines(stopsBuf);
@@ -264,18 +298,35 @@ async function main() {
   const iLocType  = stopHdrs.indexOf('location_type');
   const iParent   = stopHdrs.indexOf('parent_station');
 
-  const stopList = [];
+  // First pass: build parent → children map (all stops with a parent_station)
+  const parentToChildren = new Map(); // parentId → string[]
+  const allStopRows = [];
   for (const line of stopsGen) {
-    const cols     = line.split(',');
-    const locType  = cols[iLocType]?.trim();
-    const parent   = cols[iParent]?.trim();
+    const cols = line.split(',');
+    allStopRows.push(cols);
+    const parent = cols[iParent]?.trim();
+    const id     = cols[iStopId]?.trim();
+    if (parent && id) {
+      if (!parentToChildren.has(parent)) parentToChildren.set(parent, []);
+      parentToChildren.get(parent).push(id);
+    }
+  }
+
+  // Second pass: build stop list with childIds + markerLabel
+  const stopList = [];
+  for (const cols of allStopRows) {
+    const locType = cols[iLocType]?.trim();
+    const parent  = cols[iParent]?.trim();
     // Keep stop areas (location_type=1) OR standalone stops (no parent, location_type=0/"")
     if (locType === '1' || (!parent && (locType === '0' || locType === ''))) {
       const lat  = parseFloat(cols[iStopLat]);
       const lon  = parseFloat(cols[iStopLon]);
       const name = cols[iStopName]?.trim().replace(/^"|"$/g, '') ?? '';
-      if (!isNaN(lat) && !isNaN(lon)) {
-        stopList.push({ id: cols[iStopId]?.trim(), name, lat, lng: lon });
+      const id   = cols[iStopId]?.trim();
+      if (!isNaN(lat) && !isNaN(lon) && id) {
+        const childIds  = parentToChildren.get(id) ?? [];
+        const isMetro   = childIds.some(c => metroChildStopIds.has(c));
+        stopList.push({ id, name, lat, lng: lon, childIds, markerLabel: isMetro ? 'T' : 'H' });
       }
     }
   }

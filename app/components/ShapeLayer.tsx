@@ -25,6 +25,8 @@ interface Props {
 // Fallback colours by GTFS route type (shown before vehicle data arrives)
 const TYPE_COLOR: Record<number, string> = {
   100:  '#7c3aed', // Train   — purple
+  400:  '#185AA1', // Metro   — SL blue
+  401:  '#185AA1',
   700:  '#64748b', // Bus     — slate
   900:  '#0ea5e9', // Tram    — sky blue
   1000: '#0891b2', // Ferry   — cyan
@@ -32,7 +34,8 @@ const TYPE_COLOR: Record<number, string> = {
 };
 
 const ROUTE_TYPE_LABELS: Record<number, string> = {
-  100: 'Tåg', 700: 'Buss', 900: 'Spårvagn', 1000: 'Båt', 1200: 'Färja',
+  100: 'Tåg', 400: 'Tunnelbana', 401: 'Tunnelbana',
+  700: 'Buss', 900: 'Spårvagn', 1000: 'Båt', 1200: 'Färja',
 };
 
 export default function ShapeLayer({ vehicles, shapesPath }: Props) {

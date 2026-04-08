@@ -17,8 +17,8 @@ export interface RouteInfo {
 // GTFS route_type → transport mode label used by the app
 export const ROUTE_TYPE_MODE: Record<number, string> = {
   100:  'train',
-  400:  'train',  // metro (underground)
-  401:  'train',
+  400:  'metro',
+  401:  'metro',
   700:  'bus',
   900:  'tram',
   1000: 'ferry',
@@ -28,8 +28,8 @@ export const ROUTE_TYPE_MODE: Record<number, string> = {
 // Fallback colors when GTFS doesn't specify
 const TYPE_COLOR: Record<number, { bg: string; fg: string }> = {
   100:  { bg: '#7c3aed', fg: '#ffffff' },  // Train  — purple
-  400:  { bg: '#1d4ed8', fg: '#ffffff' },  // Metro  — blue
-  401:  { bg: '#1d4ed8', fg: '#ffffff' },
+  400:  { bg: '#185AA1', fg: '#ffffff' },  // Metro  — SL blue
+  401:  { bg: '#185AA1', fg: '#ffffff' },
   700:  { bg: '#0f766e', fg: '#ffffff' },  // Bus    — teal
   900:  { bg: '#0284c7', fg: '#ffffff' },  // Tram   — sky
   1000: { bg: '#0891b2', fg: '#ffffff' },  // Ferry  — cyan
