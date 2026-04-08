@@ -63,14 +63,10 @@ export default function GeolocationController({ triggerRef, onLocation, onError 
     );
   };
 
-  // Auto-trigger on mount
-  useEffect(() => {
-    locate();
-    return () => { dotRef.current?.remove(); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Cleanup dot on unmount
+  useEffect(() => () => { dotRef.current?.remove(); }, []);
 
-  // Expose re-trigger for the header button
+  // Expose trigger for header button and location modal
   useEffect(() => {
     triggerRef.current = locate;
   });

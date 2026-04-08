@@ -6,6 +6,7 @@ import VehicleLayer          from '@/components/VehicleLayer';
 import ShapeLayer             from '@/components/ShapeLayer';
 import StopLayer              from '@/components/StopLayer';
 import GeolocationController  from '@/components/GeolocationController';
+import LocationModal           from '@/components/LocationModal';
 import OneFingerZoom           from '@/components/OneFingerZoom';
 import FilterBar, { DEFAULT_FILTER, applyFilter } from '@/components/FilterBar';
 import type { FilterState } from '@/components/FilterBar';
@@ -114,6 +115,7 @@ export default function TransitMap({ city }: { city: CityConfig }) {
   const [filter,    setFilter]    = useState<FilterState>(DEFAULT_FILTER);
   const [geoError,  setGeoError]  = useState<string | null>(null);
   const [mapDirty,  setMapDirty]  = useState(false);
+  const [showModal, setShowModal] = useState(true);
   const [headerH,   setHeaderH]   = useState(72);
 
   const boundsRef          = useRef<string | null>(null);
@@ -263,6 +265,18 @@ export default function TransitMap({ city }: { city: CityConfig }) {
         <StopLayer shapesPath={city.shapesPath} cityId={city.id} />
         <VehicleLayer vehicles={displayed} />
       </MapContainer>
+
+      {/* Location modal — shown on every fresh load */}
+      {showModal && (
+        <LocationModal
+          cityName={city.name}
+          onLocate={() => {
+            setShowModal(false);
+            locateTrigger.current?.();
+          }}
+          onDismiss={() => setShowModal(false)}
+        />
+      )}
     </div>
   );
 }
