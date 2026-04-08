@@ -1,7 +1,7 @@
 /**
  * Fetches and caches GTFS-RT feeds for SL (Storstockholms Lokaltrafik).
  *
- * Requires env var: SL_REALTIME_KEY  (Trafiklab "GTFS Regional Realtime" product key)
+ * Requires env var: TRAFIKLAB_RT_KEY  (Trafiklab "GTFS Regional Realtime" product key)
  *
  * Both feeds are cached for CACHE_TTL_MS to avoid hammering the API on every request.
  */
@@ -19,8 +19,8 @@ let vehicleCache: Cached | null = null;
 let tripCache:    Cached | null = null;
 
 function key(): string {
-  const k = process.env.SL_REALTIME_KEY;
-  if (!k) throw new Error('SL_REALTIME_KEY not configured');
+  const k = process.env.TRAFIKLAB_RT_KEY;
+  if (!k) throw new Error('TRAFIKLAB_RT_KEY not configured');
   return k;
 }
 
