@@ -11,7 +11,8 @@
 
 import { getTripUpdateFeed }          from './feed';
 import { getRoutes, ROUTE_TYPE_MODE } from './routes';
-import { getChildIds }                from './stop-lookup';
+import { getChildIds, getStopName }   from './stop-lookup';
+import { getRouteIdForTrip }          from './trip-lookup';
 import type { NormalizedDeparture }   from '@/types/transit';
 
 const MAX_RESULTS   = 20;
@@ -43,11 +44,17 @@ export async function getSlDepartures(stopId: string): Promise<NormalizedDepartu
     const tu = entity.tripUpdate;
     if (!tu) continue;
 
-    const routeId = tu.trip?.routeId ?? '';
-    const tripId  = tu.trip?.tripId  ?? entity.id ?? '';
+    const tripId  = tu.trip?.tripId ?? entity.id ?? '';
+    // SL's GTFS-RT often omits route_id — fall back to trips.json lookup
+    const routeId = (tu.trip?.routeId as string | null | undefined) || getRouteIdForTrip(tripId);
     const route   = routes.get(routeId);
 
-    for (const stu of tu.stopTimeUpdate ?? []) {
+    // Infer destination from the last stop in the trip update
+    const stus = tu.stopTimeUpdate ?? [];
+    const lastStopId = stus.length > 0 ? stus[stus.length - 1].stopId ?? '' : '';
+    const destination = getStopName(lastStopId) || (tu.trip?.directionId != null ? `Riktning ${tu.trip.directionId}` : '');
+
+    for (const stu of stus) {
       if (!stu.stopId || !matchIds.has(stu.stopId)) continue;
 
       // departure.time is estimated Unix timestamp (seconds)
@@ -75,8 +82,8 @@ export async function getSlDepartures(stopId: string): Promise<NormalizedDepartu
             fgColor:       route?.fgColor ?? '#ffffff',
             transportMode,
           },
-          direction:                     '',   // not in TripUpdates; direction_id could be used
-          platform:                      stu.stopId ? undefined : undefined,
+          direction: destination,
+          platform:  undefined,
           plannedTime:                   new Date(plannedMs).toISOString(),
           estimatedTime:                 isDelayed ? new Date(depTime).toISOString() : undefined,
           estimatedOtherwisePlannedTime: new Date(depTime).toISOString(),

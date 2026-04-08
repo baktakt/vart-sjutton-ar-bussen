@@ -3,8 +3,9 @@
  * Fetches GTFS-RT VehiclePositions, filters to bbox, enriches with route info.
  */
 
-import { getVehicleFeed }         from './feed';
+import { getVehicleFeed }             from './feed';
 import { getRoutes, ROUTE_TYPE_MODE } from './routes';
+import { getRouteIdForTrip }          from './trip-lookup';
 import type { BBox }              from '@/lib/providers';
 import type { EnrichedVehicle, VehiclesResponse } from '@/types/vasttrafik';
 
@@ -37,11 +38,13 @@ export async function getSlVehicles(bbox: BBox): Promise<VehiclesResponse> {
       lng < bbox.lowerLeftLong || lng > bbox.upperRightLong
     ) continue;
 
-    const routeId = vp.trip?.routeId ?? '';
+    // SL's GTFS-RT often omits route_id — fall back to trips.json lookup
+    const tripId  = vp.trip?.tripId  ?? entity.id ?? '';
+    const routeId = (vp.trip?.routeId as string | null | undefined) || getRouteIdForTrip(tripId);
     const route   = routes.get(routeId);
 
     const transportMode = ROUTE_TYPE_MODE[route?.type ?? 700] ?? 'bus';
-    const vehicleId     = vp.vehicle?.id ?? vp.vehicle?.label ?? entity.id ?? routeId;
+    const vehicleId     = vp.vehicle?.id ?? vp.vehicle?.label ?? entity.id ?? tripId;
     const directionId   = toNumber(vp.trip?.directionId ?? 0);
 
     vehicles.push({

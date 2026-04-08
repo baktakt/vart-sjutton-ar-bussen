@@ -153,18 +153,28 @@ async function main() {
   const shapeRoutes   = new Map(); // shape_id → route_id
   const routeShapeIds = new Map(); // route_id → Set<shape_id>
 
-  // Build metro trip set for stop detection later
+  // Build metro trip set AND full trip→route map for GTFS-RT enrichment
+  // SL's GTFS-RT TripDescriptor often omits route_id, only including trip_id.
+  // trips.json bridges the gap: trip_id → route_id at runtime.
   const metroTripIds = new Set();
+  const tripRouteMap = {};   // trip_id → route_id (written to trips.json)
 
   for (const t of trips) {
     const meta = routeMeta.get(t.route_id);
     if (!meta) continue;
+    tripRouteMap[t.trip_id] = t.route_id;
     if (METRO_TYPES.has(meta.routeType)) metroTripIds.add(t.trip_id);
     if (!t.shape_id) continue;
     shapeRoutes.set(t.shape_id, t.route_id);
     if (!routeShapeIds.has(t.route_id)) routeShapeIds.set(t.route_id, new Set());
     routeShapeIds.get(t.route_id).add(t.shape_id);
   }
+
+  fs.writeFileSync(
+    path.join(OUT_DIR, 'trips.json'),
+    JSON.stringify({ generatedAt: new Date().toISOString(), trips: tripRouteMap }),
+  );
+  console.log(`  trips.json written (${Object.keys(tripRouteMap).length} trip→route entries)`);
 
   const wantedShapeIds = new Set(shapeRoutes.keys());
   console.log(`  ${wantedShapeIds.size} unique shape_ids across ${routeShapeIds.size} routes`);
