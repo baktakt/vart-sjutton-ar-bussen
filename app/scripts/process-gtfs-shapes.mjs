@@ -180,6 +180,33 @@ async function main() {
   console.log(`  ${wantedShapeIds.size} unique shape_ids across ${routeShapeIds.size} routes`);
   console.log(`  ${metroTripIds.size} metro trip IDs`);
 
+  // Identify routes with no shape_id — these need stop-sequence fallback shapes
+  // (SL metro / tram typically omit shape geometry from GTFS static)
+  const FALLBACK_TYPES = new Set([100, 400, 401, 900, 1000, 1200]); // non-bus
+  const noShapeRouteIds = new Set();
+  for (const [routeId] of routeMeta) {
+    if (!routeShapeIds.has(routeId)) noShapeRouteIds.add(routeId);
+  }
+  // trip_id → route_id, limited to fallback-eligible no-shape routes
+  const noShapeTripToRoute = new Map();
+  for (const t of trips) {
+    const meta = routeMeta.get(t.route_id);
+    if (!meta) continue;
+    if (noShapeRouteIds.has(t.route_id) && FALLBACK_TYPES.has(meta.routeType)) {
+      noShapeTripToRoute.set(t.trip_id, t.route_id);
+    }
+  }
+  const noShapeByType = {};
+  for (const routeId of noShapeRouteIds) {
+    const meta = routeMeta.get(routeId);
+    const label = ROUTE_TYPE_LABELS[meta.routeType] ?? `Type ${meta.routeType}`;
+    noShapeByType[label] = (noShapeByType[label] ?? 0) + 1;
+  }
+  console.log(`  ${noShapeRouteIds.size} routes with no shape_id (fallback: ${noShapeTripToRoute.size} eligible trips)`);
+  for (const [label, count] of Object.entries(noShapeByType).sort()) {
+    console.log(`    ↳ ${label}: ${count}`);
+  }
+
   // 4. Stream shapes.txt — only materialise wanted shapes
   console.log('Parsing shapes.txt (streaming)…');
   const shapesBuf = zip.getEntry('shapes.txt').getData();
@@ -254,45 +281,62 @@ async function main() {
     written++;
   }
 
-  // Sort manifest: trams first, then by name
-  manifest.sort((a, b) => {
-    if (a.routeType !== b.routeType) return a.routeType - b.routeType;
-    return a.name.localeCompare(b.name, 'sv', { numeric: true });
-  });
+  console.log(`\n${written} shape files from GTFS shapes.txt, ${skipped} routes skipped (will try stop-sequence fallback)`);
 
-  fs.writeFileSync(
-    path.join(OUT_DIR, 'manifest.json'),
-    JSON.stringify({ generatedAt: new Date().toISOString(), lines: manifest }, null, 2),
-  );
-
-  console.log(`\nDone: ${written} shape files written to public/shapes/`);
-  console.log(`Skipped: ${skipped} routes (no shape data)`);
-  console.log(`\nRoute type breakdown:`);
-  const byType = {};
-  for (const m of manifest) byType[m.label] = (byType[m.label] ?? 0) + 1;
-  for (const [label, count] of Object.entries(byType).sort()) {
-    console.log(`  ${label}: ${count}`);
-  }
-
-  // 5.5 Stream stop_times.txt → find child stop IDs served by metro routes
-  //     (only run if there are metro trips — skipped for Göteborg which has none)
+  // 5.5 Stream stop_times.txt — metro stop detection + fallback shape collection
   const metroChildStopIds = new Set();
-  if (metroTripIds.size > 0) {
+  // routeFallbackStops: route_id → Map<trip_id, Array<[seq, stopId]>>
+  const routeFallbackStops = new Map();
+
+  if (metroTripIds.size > 0 || noShapeTripToRoute.size > 0) {
     const stEntry = zip.getEntry('stop_times.txt');
     if (stEntry) {
-      console.log('\nStreaming stop_times.txt for metro stop detection…');
-      const stBuf  = stEntry.getData();
-      const stGen  = iterLines(stBuf);
-      const stHdrs = parseHeaders(stGen.next().value);
+      console.log('\nStreaming stop_times.txt for metro detection + fallback shapes…');
+      const stBuf   = stEntry.getData();
+      const stGen   = iterLines(stBuf);
+      const stHdrs  = parseHeaders(stGen.next().value);
       const iTripId = stHdrs.indexOf('trip_id');
       const iStId   = stHdrs.indexOf('stop_id');
+      const iStSeq  = stHdrs.indexOf('stop_sequence');
+
       for (const line of stGen) {
         const cols = line.split(',');
         const tid  = cols[iTripId]?.trim();
+
+        // Metro stop detection (for markerLabel in stops.json)
         if (metroTripIds.has(tid)) metroChildStopIds.add(cols[iStId]?.trim());
+
+        // Fallback stop-sequence collection for no-shape routes
+        const routeId = noShapeTripToRoute.get(tid);
+        if (routeId) {
+          const stopId = cols[iStId]?.trim();
+          const seq    = parseInt(cols[iStSeq] ?? '', 10);
+          if (stopId && !isNaN(seq)) {
+            if (!routeFallbackStops.has(routeId)) routeFallbackStops.set(routeId, new Map());
+            const tripMap = routeFallbackStops.get(routeId);
+            if (!tripMap.has(tid)) tripMap.set(tid, []);
+            tripMap.get(tid).push([seq, stopId]);
+          }
+        }
       }
       console.log(`  ${metroChildStopIds.size} unique child stop IDs served by metro`);
     }
+  }
+
+  // Pick best representative trip per no-shape route (most stop_time entries = most complete)
+  const bestTripForRoute = new Map(); // route_id → Array<[seq, stopId]> sorted
+  for (const [routeId, tripMap] of routeFallbackStops) {
+    let bestStops = null, bestCount = -1;
+    for (const stops of tripMap.values()) {
+      if (stops.length > bestCount) { bestCount = stops.length; bestStops = stops; }
+    }
+    if (bestStops) {
+      bestStops.sort((a, b) => a[0] - b[0]);
+      bestTripForRoute.set(routeId, bestStops);
+    }
+  }
+  if (bestTripForRoute.size > 0) {
+    console.log(`  ${bestTripForRoute.size} no-shape routes have stop-sequence fallbacks ready`);
   }
 
   // 6. Parse stops.txt → write stops.json (all stop areas for the map)
@@ -346,6 +390,69 @@ async function main() {
     JSON.stringify({ generatedAt: new Date().toISOString(), stops: stopList }),
   );
   console.log(`  ${stopList.length} stops written to public/shapes/${CITY_ID}/stops.json`);
+
+  // 7. Build fallback shape files from stop sequences (for routes without GTFS shape_id)
+  if (bestTripForRoute.size > 0) {
+    console.log('\nBuilding fallback shapes from stop sequences…');
+
+    // stop_id → [lat, lng] — covers all stop location types (parents and children/quays)
+    const stopCoords = new Map();
+    for (const cols of allStopRows) {
+      const id  = cols[iStopId]?.trim();
+      const lat = parseFloat(cols[iStopLat]);
+      const lon = parseFloat(cols[iStopLon]);
+      if (id && !isNaN(lat) && !isNaN(lon)) stopCoords.set(id, [lat, lon]);
+    }
+
+    let fallbackWritten = 0;
+    for (const [routeId, stopSeq] of bestTripForRoute) {
+      const meta = routeMeta.get(routeId);
+      if (!meta) continue;
+
+      const coords = [];
+      for (const [, stopId] of stopSeq) {
+        const coord = stopCoords.get(stopId);
+        if (coord) coords.push(coord);
+      }
+      if (coords.length < 2) continue;
+
+      const { name, routeType } = meta;
+      const safeName = name.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const filename = `line-${safeName}.json`;
+      fs.writeFileSync(
+        path.join(OUT_DIR, filename),
+        JSON.stringify({ name, routeType, coordinates: coords }),
+      );
+      manifest.push({
+        name,
+        routeType,
+        label: ROUTE_TYPE_LABELS[routeType] ?? `Type ${routeType}`,
+        file:  filename,
+        pointCount: coords.length,
+      });
+      fallbackWritten++;
+    }
+    console.log(`  ${fallbackWritten} fallback shape files written`);
+  }
+
+  // 8. Sort manifest and write manifest.json
+  manifest.sort((a, b) => {
+    if (a.routeType !== b.routeType) return a.routeType - b.routeType;
+    return a.name.localeCompare(b.name, 'sv', { numeric: true });
+  });
+
+  fs.writeFileSync(
+    path.join(OUT_DIR, 'manifest.json'),
+    JSON.stringify({ generatedAt: new Date().toISOString(), lines: manifest }, null, 2),
+  );
+
+  console.log(`\nTotal: ${manifest.length} lines in manifest.json`);
+  console.log('\nRoute type breakdown:');
+  const byType = {};
+  for (const m of manifest) byType[m.label] = (byType[m.label] ?? 0) + 1;
+  for (const [label, count] of Object.entries(byType).sort()) {
+    console.log(`  ${label}: ${count}`);
+  }
 }
 
 main().catch(err => { console.error('FATAL:', err.message); process.exit(1); });

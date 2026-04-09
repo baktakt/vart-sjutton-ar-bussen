@@ -185,7 +185,7 @@ export default function VehicleLayer({ vehicles }: Props) {
     // Remove departed vehicles
     for (const [id, marker] of markers.current) {
       if (!incoming.has(id)) {
-        group.removeLayer(marker);
+        try { group.removeLayer(marker); } catch { /* marker already detached */ }
         markers.current.delete(id);
         animStates.current.delete(id);
         iconKeys.current.delete(id);
