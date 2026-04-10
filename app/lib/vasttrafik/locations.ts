@@ -18,7 +18,8 @@ export async function getNearestStopArea(
 
   const res = await fetch(`${API_BASE}/locations/by-coordinates?${params}`, {
     headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
+    // Stop areas don't move — cache for 24 h cross-instance, matching the module-level cache.
+    next: { revalidate: 86_400 },
   });
 
   if (!res.ok) throw new Error(`/locations/by-coordinates failed: ${res.status}`);

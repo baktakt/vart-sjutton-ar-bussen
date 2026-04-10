@@ -42,6 +42,11 @@ const ROUTE_TYPE_LABELS = {
   1200: 'Ferry',
 };
 
+// Priority for resolving filename collisions: higher = more important.
+// The highest-priority type claiming a name keeps "line-{name}.json";
+// lower-priority types get "line-{name}-t{routeType}.json".
+const ROUTE_PRIORITY = { 401: 5, 400: 5, 100: 4, 900: 3, 1000: 2, 1200: 2, 700: 1 };
+
 // Metro route types (used to detect metro-served stops)
 const METRO_TYPES = new Set([400, 401]);
 
@@ -92,8 +97,10 @@ function parseFull(buf) {
 async function main() {
   const key = process.env.TRAFIKLAB_STATIC_KEY;
   if (!key) {
-    console.error('ERROR: TRAFIKLAB_STATIC_KEY not set in .env.local');
-    process.exit(1);
+    // Graceful skip — committed shape files are used instead.
+    // Set TRAFIKLAB_STATIC_KEY to regenerate (see .github/workflows/refresh-shapes.yml).
+    console.warn(`[process-gtfs-shapes] TRAFIKLAB_STATIC_KEY not set — skipping shape generation for ${CITY_ID}.`);
+    process.exit(0);
   }
 
   const urlFn = GTFS_URLS[CITY_ID];
@@ -244,10 +251,24 @@ async function main() {
 
   // 5. For each route, pick the longest shape (most points = most complete)
   //    and write to public/shapes/line-{name}.json
+  //
+  //    Process routes in priority order so that if two routes share the same
+  //    short name (e.g. metro T10 and ferry route 10), the more important type
+  //    claims "line-10.json" and the other gets "line-10-t1000.json".
   const manifest = [];
   let written = 0, skipped = 0;
 
-  for (const [routeId, { name, routeType }] of routeMeta) {
+  // Track which base filenames are already claimed and by which routeType
+  const claimedFilenames = new Map(); // safeName → routeType that owns it
+
+  // Sort descending by priority so high-priority types are written first
+  const sortedRouteEntries = [...routeMeta.entries()].sort(([, a], [, b]) => {
+    const pa = ROUTE_PRIORITY[a.routeType] ?? 0;
+    const pb = ROUTE_PRIORITY[b.routeType] ?? 0;
+    return pb - pa;
+  });
+
+  for (const [routeId, { name, routeType }] of sortedRouteEntries) {
     const shapeIds = routeShapeIds.get(routeId);
     if (!shapeIds || shapeIds.size === 0) { skipped++; continue; }
 
@@ -264,7 +285,19 @@ async function main() {
     const coords = shapePoints.get(bestId).map(([, lat, lon]) => [lat, lon]);
 
     const safeName = name.replace(/[^a-zA-Z0-9_-]/g, '_');
-    const filename  = `line-${safeName}.json`;
+
+    // Assign unique filename: first claimant for a name gets the base filename,
+    // subsequent claimants (name collision with a different type) get a suffix.
+    let filename;
+    const owner = claimedFilenames.get(safeName);
+    if (owner === undefined) {
+      filename = `line-${safeName}.json`;
+      claimedFilenames.set(safeName, routeType);
+    } else if (owner === routeType) {
+      filename = `line-${safeName}.json`; // same type, overwrite is fine
+    } else {
+      filename = `line-${safeName}-t${routeType}.json`;
+    }
 
     fs.writeFileSync(
       path.join(OUT_DIR, filename),
@@ -418,7 +451,16 @@ async function main() {
 
       const { name, routeType } = meta;
       const safeName = name.replace(/[^a-zA-Z0-9_-]/g, '_');
-      const filename = `line-${safeName}.json`;
+      const owner = claimedFilenames.get(safeName);
+      let filename;
+      if (owner === undefined) {
+        filename = `line-${safeName}.json`;
+        claimedFilenames.set(safeName, routeType);
+      } else if (owner === routeType) {
+        filename = `line-${safeName}.json`;
+      } else {
+        filename = `line-${safeName}-t${routeType}.json`;
+      }
       fs.writeFileSync(
         path.join(OUT_DIR, filename),
         JSON.stringify({ name, routeType, coordinates: coords }),

@@ -105,18 +105,36 @@ function SearchIcon() {
   );
 }
 
+function TransitMapIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      {/* Two coloured transit lines */}
+      <path d="M3 7h18"/>
+      <path d="M3 17h18"/>
+      {/* Station dots */}
+      <circle cx="7"  cy="7"  r="2" fill="currentColor" stroke="none"/>
+      <circle cx="17" cy="7"  r="2" fill="currentColor" stroke="none"/>
+      <circle cx="12" cy="17" r="2" fill="currentColor" stroke="none"/>
+      {/* Transfer connector */}
+      <path d="M12 7v10"/>
+    </svg>
+  );
+}
+
 // ---------- main component ----------
 
 export default function TransitMap({ city }: { city: CityConfig }) {
-  const [vehicles,  setVehicles]  = useState<EnrichedVehicle[]>([]);
-  const [fetchedAt, setFetchedAt] = useState<string | null>(null);
-  const [loading,   setLoading]   = useState(true);
-  const [error,     setError]     = useState<string | null>(null);
-  const [filter,    setFilter]    = useState<FilterState>(DEFAULT_FILTER);
-  const [geoError,  setGeoError]  = useState<string | null>(null);
-  const [mapDirty,  setMapDirty]  = useState(false);
-  const [showModal, setShowModal] = useState(true);
-  const [headerH,   setHeaderH]   = useState(72);
+  const [vehicles,       setVehicles]       = useState<EnrichedVehicle[]>([]);
+  const [fetchedAt,      setFetchedAt]      = useState<string | null>(null);
+  const [loading,        setLoading]        = useState(true);
+  const [error,          setError]          = useState<string | null>(null);
+  const [filter,         setFilter]         = useState<FilterState>(DEFAULT_FILTER);
+  const [geoError,       setGeoError]       = useState<string | null>(null);
+  const [mapDirty,       setMapDirty]       = useState(false);
+  const [showModal,      setShowModal]      = useState(true);
+  const [headerH,        setHeaderH]        = useState(72);
+  const [transitMapMode, setTransitMapMode] = useState(false);
 
   const boundsRef          = useRef<string | null>(null);
   const lastPolledBoundsRef = useRef<string | null>(null);
@@ -184,7 +202,7 @@ export default function TransitMap({ city }: { city: CityConfig }) {
     : null;
 
   return (
-    <div className="relative w-full h-full">
+    <div className={`relative w-full h-full${transitMapMode ? ' transit-map-mode' : ''}`}>
 
       {/* ── Header ── */}
       <div ref={headerRef}
@@ -208,6 +226,18 @@ export default function TransitMap({ city }: { city: CityConfig }) {
               {error && <span className="text-red-400"> · ⚠ fel</span>}
             </p>
           </div>
+
+          <button
+            onClick={() => setTransitMapMode(m => !m)}
+            title={transitMapMode ? 'Visa vanlig karta' : 'Visa linjenätskarta'}
+            className={`p-1.5 rounded-full flex-shrink-0 transition-colors ${
+              transitMapMode
+                ? 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                : 'bg-slate-700/60 hover:bg-slate-600 text-slate-300'
+            }`}
+          >
+            <TransitMapIcon />
+          </button>
 
           <button
             onClick={() => locateTrigger.current?.()}
@@ -261,7 +291,7 @@ export default function TransitMap({ city }: { city: CityConfig }) {
           onLocation={handleLocation}
           onError={setGeoError}
         />
-        <ShapeLayer vehicles={modeFiltered} shapesPath={city.shapesPath} />
+        <ShapeLayer vehicles={modeFiltered} shapesPath={city.shapesPath} transitMapMode={transitMapMode} />
         <StopLayer shapesPath={city.shapesPath} cityId={city.id} />
         <VehicleLayer vehicles={displayed} />
       </MapContainer>

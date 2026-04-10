@@ -25,7 +25,9 @@ function key(): string {
 }
 
 async function fetchFeed(url: string): Promise<Feed> {
-  const res = await fetch(`${url}?key=${key()}`, { cache: 'no-store' });
+  // next.revalidate: Next.js Data Cache (shared across all serverless instances).
+  // The module-level cache above still runs first — this is the cross-instance fallback.
+  const res = await fetch(`${url}?key=${key()}`, { next: { revalidate: 14 } });
   if (!res.ok) throw new Error(`GTFS-RT fetch failed (${res.status}): ${url}`);
   const buf = await res.arrayBuffer();
   return transit_realtime.FeedMessage.decode(new Uint8Array(buf));
