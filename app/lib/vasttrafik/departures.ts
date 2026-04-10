@@ -11,7 +11,8 @@ export async function fetchDepartures(
 
   const res = await fetch(`${API_BASE}/stop-areas/${stopAreaGid}/departures?${params}`, {
     headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
+    // Shared across instances; 29 s keeps data fresh within the 30 s module-level cache window.
+    next: { revalidate: 29 },
   });
 
   if (!res.ok) throw new Error(`/stop-areas/${stopAreaGid}/departures failed: ${res.status}`);

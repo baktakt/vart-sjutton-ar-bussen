@@ -1,0 +1,66 @@
+name: Refresh GTFS Shapes
+
+# Runs on the 1st of every month and can be triggered manually from the
+# GitHub Actions tab (useful after a city publishes an updated GTFS feed).
+on:
+  schedule:
+    - cron: '0 3 1 * *'   # 03:00 UTC on the 1st of each month
+  workflow_dispatch:
+    inputs:
+      city:
+        description: 'City to refresh (goteborg | stockholm | all)'
+        required: false
+        default: 'all'
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed to commit shape files back to the repo
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: app
+        run: npm ci
+
+      - name: Refresh shapes (scheduled — all cities)
+        if: github.event_name == 'schedule'
+        working-directory: app
+        env:
+          TRAFIKLAB_STATIC_KEY: ${{ secrets.TRAFIKLAB_STATIC_KEY }}
+        run: npm run process-shapes:all
+
+      - name: Refresh shapes (manual dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        working-directory: app
+        env:
+          TRAFIKLAB_STATIC_KEY: ${{ secrets.TRAFIKLAB_STATIC_KEY }}
+        run: |
+          CITY="${{ github.event.inputs.city }}"
+          if [ "$CITY" = "all" ]; then
+            npm run process-shapes:all
+          else
+            node scripts/process-gtfs-shapes.mjs --city "$CITY"
+          fi
+
+      - name: Commit updated shapes
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add app/public/shapes/
+          if git diff --staged --quiet; then
+            echo "No shape changes — nothing to commit."
+          else
+            git commit -m "chore: refresh GTFS shape data ($(date -u +%Y-%m-%d))"
+            git push
+          fi

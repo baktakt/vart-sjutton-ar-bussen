@@ -27,7 +27,9 @@ export async function fetchPositions(token: string, bbox?: BBox): Promise<VTVehi
 
   const res = await fetch(`${API_BASE}/positions?${params}`, {
     headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
+    // next.revalidate: shared Data Cache across serverless instances.
+    // Authorization header is part of the cache key, so rotated tokens get fresh data.
+    next: { revalidate: 14 },
   });
 
   if (!res.ok) throw new Error(`/positions failed: ${res.status}`);

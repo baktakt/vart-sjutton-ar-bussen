@@ -97,8 +97,10 @@ function parseFull(buf) {
 async function main() {
   const key = process.env.TRAFIKLAB_STATIC_KEY;
   if (!key) {
-    console.error('ERROR: TRAFIKLAB_STATIC_KEY not set in .env.local');
-    process.exit(1);
+    // Graceful skip — committed shape files are used instead.
+    // Set TRAFIKLAB_STATIC_KEY to regenerate (see .github/workflows/refresh-shapes.yml).
+    console.warn(`[process-gtfs-shapes] TRAFIKLAB_STATIC_KEY not set — skipping shape generation for ${CITY_ID}.`);
+    process.exit(0);
   }
 
   const urlFn = GTFS_URLS[CITY_ID];
