@@ -73,57 +73,21 @@ function iconKey(v: EnrichedVehicle): string {
   return `${v.lineName}|${v.delayMinutes ?? 'null'}|${v.isCancelled}`;
 }
 
-// ─── Animation ────────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-interface AnimState {
-  fromLat: number;
-  fromLng: number;
-  toLat:   number;
-  toLng:   number;
-  startMs: number;
-  durMs:   number;
-  // Cached rendered position — avoids calling getLatLng() each RAF tick
-  curLat:  number;
-  curLng:  number;
-}
-
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-
-/**
- * Move a marker without firing the Leaflet 'move' event.
- * setLatLng() fires 'move' which causes MarkerClusterGroup to re-cluster
- * on every call — at 60 fps this floods the event queue and breaks clicks.
- * Writing _latlng directly + update() moves the CSS transform only.
- */
-function moveMarker(marker: L.Marker, lat: number, lng: number): void {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const m = marker as any;
-  // Guard: marker may be detached from map during cluster recalc or unmount.
-  // m.update() calls this._map.latLngToLayerPoint() — throws if _map is null.
-  if (!m._map) return;
-  const latlng = L.latLng(lat, lng);
-  m._latlng = latlng;
-  m.update();
-  marker.getTooltip()?.setLatLng(latlng);
-}
-
-// If a vehicle moves more than ~1 km between polls it's a GPS jump — snap instead
-const TELEPORT_DEG = 0.01;
-const POLL_MS      = 15_000;
-// Skip a setLatLng call if the new position is indistinguishably close to current
-const MIN_DELTA    = 1e-7;
+/** Duration of the fade-out and fade-in transitions in ms. */
+const FADE_MS = 280;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface Props { vehicles: EnrichedVehicle[] }
 
 export default function VehicleLayer({ vehicles }: Props) {
-  const map        = useMap();
-  const cluster    = useRef<L.MarkerClusterGroup | null>(null);
-  const markers    = useRef(new Map<string, L.Marker>());
-  const animStates = useRef(new Map<string, AnimState>());
-  const iconKeys   = useRef(new Map<string, string>());   // last-rendered icon state
-  const rafId      = useRef<number | null>(null);
+  const map      = useMap();
+  const cluster  = useRef<L.MarkerClusterGroup | null>(null);
+  const markers  = useRef(new Map<string, L.Marker>());
+  const iconKeys = useRef(new Map<string, string>());   // last-rendered icon state
+  const fadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Cluster group ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -142,35 +106,7 @@ export default function VehicleLayer({ vehicles }: Props) {
     };
   }, [map]);
 
-  // ── 60 fps RAF loop ────────────────────────────────────────────────────────
-  useEffect(() => {
-    const tick = () => {
-      rafId.current = requestAnimationFrame(tick);
-      if (animStates.current.size === 0) return;
-
-      try {
-        const now = Date.now();
-        for (const [id, anim] of animStates.current) {
-          if (anim.startMs === 0) continue;
-          const t   = Math.min(1, (now - anim.startMs) / anim.durMs);
-          const lat = lerp(anim.fromLat, anim.toLat, t);
-          const lng = lerp(anim.fromLng, anim.toLng, t);
-          if (Math.abs(lat - anim.curLat) < MIN_DELTA && Math.abs(lng - anim.curLng) < MIN_DELTA) continue;
-          const m = markers.current.get(id);
-          if (m) moveMarker(m, lat, lng);
-          anim.curLat = lat;
-          anim.curLng = lng;
-        }
-      } catch (err) {
-        // Swallow — a single bad frame should never crash the page
-        console.warn('[VehicleLayer] animation tick error:', err);
-      }
-    };
-    rafId.current = requestAnimationFrame(tick);
-    return () => { if (rafId.current !== null) cancelAnimationFrame(rafId.current); };
-  }, []);
-
-  // ── Diff incoming vehicles ─────────────────────────────────────────────────
+  // ── Diff incoming vehicles with fade transition ────────────────────────────
   useEffect(() => {
     const group = cluster.current;
     // Guard: if the group has been removed from the map its internal state is
@@ -179,84 +115,100 @@ export default function VehicleLayer({ vehicles }: Props) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (!group || !(group as any)._map) return;
 
-    const now      = Date.now();
-    const incoming = new Map(vehicles.map(v => [v.id, v]));
+    // Cancel any in-flight fade from a previous update
+    if (fadeTimer.current !== null) clearTimeout(fadeTimer.current);
 
-    // Remove departed vehicles
-    for (const [id, marker] of markers.current) {
-      if (!incoming.has(id)) {
-        try { group.removeLayer(marker); } catch { /* marker already detached */ }
-        markers.current.delete(id);
-        animStates.current.delete(id);
-        iconKeys.current.delete(id);
+    // Step 1 — fade out all currently visible markers
+    for (const [, marker] of markers.current) {
+      const el = marker.getElement();
+      if (el) {
+        el.style.transition = `opacity ${FADE_MS}ms ease`;
+        el.style.opacity = '0';
       }
     }
 
-    const newMarkers: L.Marker[] = [];
+    // Step 2 — after fade-out, reposition and fade back in
+    fadeTimer.current = setTimeout(() => {
+      fadeTimer.current = null;
+      const g = cluster.current;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (!g || !(g as any)._map) return;
 
-    for (const v of vehicles) {
-      const existing = markers.current.get(v.id);
-      const prevAnim = animStates.current.get(v.id);
+      const incoming = new Map(vehicles.map(v => [v.id, v]));
 
-      if (existing) {
-        const fromLat = prevAnim?.curLat ?? v.lat;
-        const fromLng = prevAnim?.curLng ?? v.lng;
-        const dist    = Math.hypot(v.lat - fromLat, v.lng - fromLng);
-        const snap    = dist > TELEPORT_DEG;
-
-        if (snap) moveMarker(existing, v.lat, v.lng);
-
-        animStates.current.set(v.id, {
-          fromLat: snap ? v.lat : fromLat,
-          fromLng: snap ? v.lng : fromLng,
-          toLat:   v.lat,
-          toLng:   v.lng,
-          startMs: now,
-          durMs:   snap ? 1 : POLL_MS,
-          curLat:  snap ? v.lat : fromLat,
-          curLng:  snap ? v.lng : fromLng,
-        });
-
-        // Only rebuild icon if visual state changed — avoids tooltip flicker
-        const key = iconKey(v);
-        if (iconKeys.current.get(v.id) !== key) {
-          existing.setIcon(makeIcon(v));
-          existing.setTooltipContent(tooltipHtml(v));
-          iconKeys.current.set(v.id, key);
+      // Remove departed vehicles
+      for (const [id, marker] of markers.current) {
+        if (!incoming.has(id)) {
+          try { g.removeLayer(marker); } catch { /* marker already detached */ }
+          markers.current.delete(id);
+          iconKeys.current.delete(id);
         }
-      } else {
-        // First sighting — place immediately, queue for bulk addLayers
-        animStates.current.set(v.id, {
-          fromLat: v.lat, fromLng: v.lng,
-          toLat:   v.lat, toLng:   v.lng,
-          startMs: 0,     durMs:   POLL_MS,
-          curLat:  v.lat, curLng:  v.lng,
+      }
+
+      const newMarkers: L.Marker[] = [];
+
+      for (const v of vehicles) {
+        const existing = markers.current.get(v.id);
+
+        if (existing) {
+          // Reposition in place — only happens once per 15 s, so no event-flood concern
+          existing.setLatLng([v.lat, v.lng]);
+
+          // Only rebuild icon if visual state changed — avoids tooltip flicker
+          const key = iconKey(v);
+          if (iconKeys.current.get(v.id) !== key) {
+            existing.setIcon(makeIcon(v));
+            existing.setTooltipContent(tooltipHtml(v));
+            iconKeys.current.set(v.id, key);
+          }
+
+          // Fade back in
+          const el = existing.getElement();
+          if (el) {
+            el.style.transition = `opacity ${FADE_MS}ms ease`;
+            el.style.opacity = '1';
+          }
+        } else {
+          // First sighting — queue for bulk addLayers, will fade in once in DOM
+          iconKeys.current.set(v.id, iconKey(v));
+          const marker = L.marker([v.lat, v.lng], { icon: makeIcon(v) })
+            .bindTooltip(tooltipHtml(v), { direction: 'top', offset: [0, -20] });
+          markers.current.set(v.id, marker);
+          newMarkers.push(marker);
+        }
+      }
+
+      // Bulk-add new markers (single cluster recalculation instead of N)
+      if (newMarkers.length > 0) {
+        try {
+          g.addLayers(newMarkers);
+        } catch (err) {
+          console.warn('[VehicleLayer] addLayers failed, falling back to addLayer:', err);
+          newMarkers.forEach(m => { try { g.addLayer(m); } catch {} });
+        }
+
+        // Fade in newly added markers on next frame (element exists in DOM now)
+        requestAnimationFrame(() => {
+          for (const m of newMarkers) {
+            const el = m.getElement();
+            if (!el) continue;
+            // Start hidden, then transition to visible
+            el.style.transition = 'none';
+            el.style.opacity = '0';
+            // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+            void el.offsetHeight; // force reflow so transition fires
+            el.style.transition = `opacity ${FADE_MS}ms ease`;
+            el.style.opacity = '1';
+          }
         });
-        iconKeys.current.set(v.id, iconKey(v));
-
-        const marker = L.marker([v.lat, v.lng], { icon: makeIcon(v) })
-          .bindTooltip(tooltipHtml(v), { direction: 'top', offset: [0, -20] });
-        markers.current.set(v.id, marker);
-        newMarkers.push(marker);
       }
-    }
-
-    // Bulk-add new markers (single cluster recalculation instead of N)
-    if (newMarkers.length > 0) {
-      try {
-        group.addLayers(newMarkers);
-      } catch (err) {
-        console.warn('[VehicleLayer] addLayers failed, falling back to addLayer:', err);
-        newMarkers.forEach(m => { try { group.addLayer(m); } catch {} });
-      }
-    }
+    }, FADE_MS);
   }, [vehicles]);
 
   // ── Cleanup ────────────────────────────────────────────────────────────────
   useEffect(() => () => {
-    if (rafId.current !== null) cancelAnimationFrame(rafId.current);
+    if (fadeTimer.current !== null) clearTimeout(fadeTimer.current);
     markers.current.clear();
-    animStates.current.clear();
     iconKeys.current.clear();
   }, []);
 
