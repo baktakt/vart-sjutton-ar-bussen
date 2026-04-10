@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import { Polyline, Tooltip } from 'react-leaflet';
 import type { PathOptions } from 'leaflet';
 import type { EnrichedVehicle } from '@/types/vasttrafik';
+import type { FilterMode } from '@/components/FilterBar';
 
 interface ShapeFile {
   name: string;
@@ -21,7 +22,17 @@ interface Props {
   vehicles: EnrichedVehicle[];
   shapesPath: string;
   transitMapMode?: boolean;
+  filterMode?: FilterMode;
 }
+
+/** Maps a filter mode to the GTFS routeTypes that should be shown. */
+const FILTER_ROUTE_TYPES: Partial<Record<FilterMode, Set<number>>> = {
+  metro: new Set([400, 401]),
+  train: new Set([100]),
+  tram:  new Set([900]),
+  bus:   new Set([700]),
+  boat:  new Set([1000, 1200]),
+};
 
 // Fallback colours by GTFS route type (shown before vehicle data arrives)
 const TYPE_COLOR: Record<number, string> = {
@@ -51,7 +62,7 @@ const TYPE_PRIORITY: Record<number, number> = {
   700: 1,
 };
 
-export default function ShapeLayer({ vehicles, shapesPath, transitMapMode = false }: Props) {
+export default function ShapeLayer({ vehicles, shapesPath, transitMapMode = false, filterMode = 'all' }: Props) {
   const [manifest,     setManifest]     = useState<ManifestEntry[]>([]);
   const [loadedShapes, setLoadedShapes] = useState<Map<string, ShapeFile>>(new Map());
   const fetching    = useRef(new Set<string>());
@@ -163,6 +174,10 @@ export default function ShapeLayer({ vehicles, shapesPath, transitMapMode = fals
         const mPriority = TYPE_PRIORITY[mType] ?? 0;
         const fPriority = TYPE_PRIORITY[shape.routeType] ?? 0;
         if (shape.routeType !== mType && fPriority < mPriority) return null;
+
+        // Hide shapes that don't match the active filter mode
+        const allowedTypes = FILTER_ROUTE_TYPES[filterMode];
+        if (allowedTypes && !allowedTypes.has(mType)) return null;
 
         // Use manifest routeType for display (even if file type differs slightly)
         const color     = colorCache.current.get(name) ?? TYPE_COLOR[mType] ?? '#94a3b8';
