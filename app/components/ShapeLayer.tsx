@@ -20,6 +20,7 @@ interface ManifestEntry {
 interface Props {
   vehicles: EnrichedVehicle[];
   shapesPath: string;
+  transitMapMode?: boolean;
 }
 
 // Fallback colours by GTFS route type (shown before vehicle data arrives)
@@ -38,12 +39,27 @@ const ROUTE_TYPE_LABELS: Record<number, string> = {
   700: 'Buss', 900: 'Spårvagn', 1000: 'Båt', 1200: 'Färja',
 };
 
-export default function ShapeLayer({ vehicles, shapesPath }: Props) {
+/**
+ * Priority for resolving name collisions: higher = shown in preference.
+ * Metro > Train > Tram > Ferry > Bus
+ */
+const TYPE_PRIORITY: Record<number, number> = {
+  400: 5, 401: 5,
+  100: 4,
+  900: 3,
+  1000: 2, 1200: 2,
+  700: 1,
+};
+
+export default function ShapeLayer({ vehicles, shapesPath, transitMapMode = false }: Props) {
   const [manifest,     setManifest]     = useState<ManifestEntry[]>([]);
   const [loadedShapes, setLoadedShapes] = useState<Map<string, ShapeFile>>(new Map());
-  const fetching   = useRef(new Set<string>());
+  const fetching    = useRef(new Set<string>());
   // Persistent colour map — survives vehicle leaving the viewport
-  const colorCache = useRef(new Map<string, string>());
+  const colorCache  = useRef(new Map<string, string>());
+  // For each shape name: the highest-priority routeType seen in the manifest.
+  // Used to detect data corruption (e.g. ferry file overwriting metro file).
+  const manifestType = useRef(new Map<string, number>());
 
   // ── Load manifest once ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -52,6 +68,25 @@ export default function ShapeLayer({ vehicles, shapesPath }: Props) {
       .then(d => { if (d?.lines) setManifest(d.lines); })
       .catch(() => {});
   }, [shapesPath]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Build deduplicated manifest (highest-priority type wins per name) ───────
+  const dedupedManifest = useMemo(() => {
+    const best = new Map<string, ManifestEntry>();
+    for (const entry of manifest) {
+      const existing = best.get(entry.name);
+      const p = TYPE_PRIORITY[entry.routeType] ?? 0;
+      const ep = existing ? (TYPE_PRIORITY[existing.routeType] ?? 0) : -1;
+      if (p > ep) best.set(entry.name, entry);
+    }
+    return [...best.values()];
+  }, [manifest]);
+
+  // Populate manifestType ref whenever dedupedManifest changes
+  useEffect(() => {
+    for (const entry of dedupedManifest) {
+      manifestType.current.set(entry.name, entry.routeType);
+    }
+  }, [dedupedManifest]);
 
   // ── Fetch helper ────────────────────────────────────────────────────────────
   function fetchShapes(entries: ManifestEntry[]) {
@@ -82,10 +117,10 @@ export default function ShapeLayer({ vehicles, shapesPath }: Props) {
   // Trams (900) = 171 KB, Trains (100) = 554 KB, Boats (1000) = 26 KB → ~751 KB total
   // Buses (700) = 12 MB → lazy-load only when a bus appears in the area
   useEffect(() => {
-    if (manifest.length === 0) return;
-    fetchShapes(manifest.filter(e => e.routeType !== 700));
+    if (dedupedManifest.length === 0) return;
+    fetchShapes(dedupedManifest.filter(e => e.routeType !== 700));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [manifest]);
+  }, [dedupedManifest]);
 
   // ── Active bus line names (for lazy bus shape loading) ─────────────────────
   const activeBusNames = useMemo(
@@ -95,15 +130,15 @@ export default function ShapeLayer({ vehicles, shapesPath }: Props) {
 
   // ── Lazy-load bus shapes when a bus vehicle appears ────────────────────────
   useEffect(() => {
-    if (manifest.length === 0 || activeBusNames.size === 0) return;
-    const byName = new Map(manifest.map(e => [e.name, e]));
+    if (dedupedManifest.length === 0 || activeBusNames.size === 0) return;
+    const byName = new Map(dedupedManifest.map(e => [e.name, e]));
     fetchShapes(
       [...activeBusNames]
         .map(name => byName.get(name))
         .filter((e): e is ManifestEntry => !!e),
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeBusNames, manifest]);
+  }, [activeBusNames, dedupedManifest]);
 
   // ── Update colour cache from live vehicle data ─────────────────────────────
   useEffect(() => {
@@ -119,10 +154,26 @@ export default function ShapeLayer({ vehicles, shapesPath }: Props) {
     <>
       {[...loadedShapes.entries()].map(([name, shape]) => {
         if (shape.coordinates.length < 2) return null;
-        const color     = colorCache.current.get(name) ?? TYPE_COLOR[shape.routeType] ?? '#94a3b8';
-        const typeLabel = ROUTE_TYPE_LABELS[shape.routeType] ?? '';
-        const normal: PathOptions  = { color, weight: 4, opacity: 0.55 };
-        const hovered: PathOptions = { color, weight: 7, opacity: 0.9 };
+
+        // Guard against data corruption: if the manifest expected a higher-priority
+        // type but the file contains a lower-priority type, the file was overwritten
+        // by a name-colliding route (e.g. ferry "10" overwriting metro T10).
+        // Skip rendering to avoid drawing in the wrong location.
+        const mType = manifestType.current.get(name) ?? shape.routeType;
+        const mPriority = TYPE_PRIORITY[mType] ?? 0;
+        const fPriority = TYPE_PRIORITY[shape.routeType] ?? 0;
+        if (shape.routeType !== mType && fPriority < mPriority) return null;
+
+        // Use manifest routeType for display (even if file type differs slightly)
+        const color     = colorCache.current.get(name) ?? TYPE_COLOR[mType] ?? '#94a3b8';
+        const typeLabel = ROUTE_TYPE_LABELS[mType] ?? '';
+
+        const isMetro = mType === 400 || mType === 401;
+        const weight  = transitMapMode ? (isMetro ? 9 : 6) : 4;
+        const opacity = transitMapMode ? 0.95 : 0.55;
+
+        const normal: PathOptions  = { color, weight, opacity };
+        const hovered: PathOptions = { color, weight: weight + 3, opacity: Math.min(opacity + 0.3, 1) };
         return (
           <Polyline
             key={name}
