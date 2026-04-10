@@ -291,7 +291,7 @@ export default function TransitMap({ city }: { city: CityConfig }) {
           onLocation={handleLocation}
           onError={setGeoError}
         />
-        <ShapeLayer vehicles={modeFiltered} shapesPath={city.shapesPath} transitMapMode={transitMapMode} />
+        <ShapeLayer vehicles={modeFiltered} shapesPath={city.shapesPath} transitMapMode={transitMapMode} filterMode={filter.mode} />
         <StopLayer shapesPath={city.shapesPath} cityId={city.id} />
         <VehicleLayer vehicles={displayed} />
       </MapContainer>
