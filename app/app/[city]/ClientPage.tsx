@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { Component, type ReactNode } from 'react';
 import type { CityConfig } from '@/lib/providers';
+import DWVFooter from '@/components/DWVFooter';
 
 const TransitMap = dynamic(() => import('@/components/Map'), { ssr: false });
 
@@ -33,10 +34,13 @@ class MapErrorBoundary extends Component<
 
 export default function ClientPage({ city }: { city: CityConfig }) {
   return (
-    <main className="w-screen h-screen bg-slate-950">
-      <MapErrorBoundary>
-        <TransitMap city={city} />
-      </MapErrorBoundary>
+    <main className="w-screen h-screen bg-slate-950 flex flex-col">
+      <div className="flex-1 relative">
+        <MapErrorBoundary>
+          <TransitMap city={city} />
+        </MapErrorBoundary>
+      </div>
+      <DWVFooter toolName={city.name} />
     </main>
   );
 }
