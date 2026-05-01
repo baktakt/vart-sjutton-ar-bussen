@@ -1,12 +1,12 @@
 {
-  "generatedAt": "2026-04-10T16:16:31.931Z",
+  "generatedAt": "2026-05-01T04:25:40.703Z",
   "lines": [
     {
       "name": "TÅG",
       "routeType": 100,
       "label": "Train",
       "file": "line-T_G.json",
-      "pointCount": 593
+      "pointCount": 594
     },
     {
       "name": "TÅG",
@@ -55,7 +55,7 @@
       "routeType": 100,
       "label": "Train",
       "file": "line-T_G.json",
-      "pointCount": 2067
+      "pointCount": 2070
     },
     {
       "name": "TÅG",
@@ -153,7 +153,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-1-t700.json",
-      "pointCount": 687
+      "pointCount": 688
     },
     {
       "name": "1",
@@ -167,7 +167,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-1-t700.json",
-      "pointCount": 578
+      "pointCount": 536
     },
     {
       "name": "1",
@@ -223,21 +223,14 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-1-t700.json",
-      "pointCount": 708
-    },
-    {
-      "name": "1E",
-      "routeType": 700,
-      "label": "Bus",
-      "file": "line-1E.json",
-      "pointCount": 240
+      "pointCount": 710
     },
     {
       "name": "2",
       "routeType": 700,
       "label": "Bus",
       "file": "line-2-t700.json",
-      "pointCount": 551
+      "pointCount": 535
     },
     {
       "name": "2",
@@ -265,14 +258,14 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-2-t700.json",
-      "pointCount": 256
+      "pointCount": 263
     },
     {
       "name": "2",
       "routeType": 700,
       "label": "Bus",
       "file": "line-2-t700.json",
-      "pointCount": 730
+      "pointCount": 723
     },
     {
       "name": "2",
@@ -314,7 +307,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-2-t700.json",
-      "pointCount": 570
+      "pointCount": 571
     },
     {
       "name": "3",
@@ -412,7 +405,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-5-t700.json",
-      "pointCount": 427
+      "pointCount": 425
     },
     {
       "name": "5",
@@ -433,28 +426,28 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-5E.json",
-      "pointCount": 107
+      "pointCount": 152
     },
     {
       "name": "6",
       "routeType": 700,
       "label": "Bus",
       "file": "line-6-t700.json",
-      "pointCount": 417
+      "pointCount": 420
     },
     {
       "name": "6",
       "routeType": 700,
       "label": "Bus",
       "file": "line-6-t700.json",
-      "pointCount": 551
+      "pointCount": 544
     },
     {
       "name": "7",
       "routeType": 700,
       "label": "Bus",
       "file": "line-7-t700.json",
-      "pointCount": 451
+      "pointCount": 440
     },
     {
       "name": "8",
@@ -469,13 +462,6 @@
       "label": "Bus",
       "file": "line-8-t700.json",
       "pointCount": 129
-    },
-    {
-      "name": "8E",
-      "routeType": 700,
-      "label": "Bus",
-      "file": "line-8E.json",
-      "pointCount": 256
     },
     {
       "name": "9",
@@ -517,28 +503,28 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-17.json",
-      "pointCount": 699
+      "pointCount": 712
     },
     {
       "name": "18",
       "routeType": 700,
       "label": "Bus",
       "file": "line-18.json",
-      "pointCount": 733
+      "pointCount": 827
     },
     {
       "name": "19",
       "routeType": 700,
       "label": "Bus",
       "file": "line-19.json",
-      "pointCount": 912
+      "pointCount": 911
     },
     {
       "name": "19",
       "routeType": 700,
       "label": "Bus",
       "file": "line-19.json",
-      "pointCount": 778
+      "pointCount": 806
     },
     {
       "name": "20",
@@ -580,7 +566,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-21.json",
-      "pointCount": 892
+      "pointCount": 920
     },
     {
       "name": "22",
@@ -601,7 +587,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-23.json",
-      "pointCount": 429
+      "pointCount": 405
     },
     {
       "name": "24",
@@ -713,7 +699,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-35.json",
-      "pointCount": 903
+      "pointCount": 935
     },
     {
       "name": "35",
@@ -741,7 +727,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-37.json",
-      "pointCount": 3603
+      "pointCount": 2385
     },
     {
       "name": "37",
@@ -755,7 +741,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-38.json",
-      "pointCount": 3116
+      "pointCount": 1861
     },
     {
       "name": "38",
@@ -770,6 +756,13 @@
       "label": "Bus",
       "file": "line-40.json",
       "pointCount": 694
+    },
+    {
+      "name": "41",
+      "routeType": 700,
+      "label": "Bus",
+      "file": "line-41.json",
+      "pointCount": 2693
     },
     {
       "name": "41",
@@ -797,7 +790,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-42.json",
-      "pointCount": 508
+      "pointCount": 510
     },
     {
       "name": "43",
@@ -811,7 +804,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-44.json",
-      "pointCount": 934
+      "pointCount": 931
     },
     {
       "name": "46",
@@ -853,7 +846,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-55.json",
-      "pointCount": 848
+      "pointCount": 849
     },
     {
       "name": "56",
@@ -895,7 +888,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-60.json",
-      "pointCount": 560
+      "pointCount": 552
     },
     {
       "name": "61",
@@ -909,14 +902,14 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-61.json",
-      "pointCount": 346
+      "pointCount": 343
     },
     {
       "name": "62",
       "routeType": 700,
       "label": "Bus",
       "file": "line-62.json",
-      "pointCount": 643
+      "pointCount": 996
     },
     {
       "name": "62",
@@ -944,7 +937,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-63.json",
-      "pointCount": 389
+      "pointCount": 388
     },
     {
       "name": "64",
@@ -958,7 +951,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-64.json",
-      "pointCount": 350
+      "pointCount": 423
     },
     {
       "name": "65",
@@ -993,7 +986,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-68.json",
-      "pointCount": 530
+      "pointCount": 505
     },
     {
       "name": "69",
@@ -1084,7 +1077,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-86.json",
-      "pointCount": 609
+      "pointCount": 611
     },
     {
       "name": "89",
@@ -1231,7 +1224,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-111.json",
-      "pointCount": 1516
+      "pointCount": 1517
     },
     {
       "name": "114",
@@ -1336,7 +1329,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-141.json",
-      "pointCount": 459
+      "pointCount": 469
     },
     {
       "name": "142",
@@ -1350,7 +1343,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-145.json",
-      "pointCount": 767
+      "pointCount": 775
     },
     {
       "name": "148",
@@ -1406,7 +1399,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-157.json",
-      "pointCount": 327
+      "pointCount": 318
     },
     {
       "name": "158",
@@ -1420,7 +1413,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-159.json",
-      "pointCount": 882
+      "pointCount": 714
     },
     {
       "name": "159",
@@ -1441,7 +1434,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-160.json",
-      "pointCount": 3
+      "pointCount": 94
     },
     {
       "name": "167",
@@ -1456,6 +1449,13 @@
       "label": "Bus",
       "file": "line-168.json",
       "pointCount": 179
+    },
+    {
+      "name": "170",
+      "routeType": 700,
+      "label": "Bus",
+      "file": "line-170.json",
+      "pointCount": 512
     },
     {
       "name": "173",
@@ -1504,7 +1504,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-190.json",
-      "pointCount": 591
+      "pointCount": 594
     },
     {
       "name": "193",
@@ -1539,7 +1539,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-199.json",
-      "pointCount": 684
+      "pointCount": 688
     },
     {
       "name": "200",
@@ -1609,7 +1609,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-212.json",
-      "pointCount": 1101
+      "pointCount": 1129
     },
     {
       "name": "220",
@@ -1637,7 +1637,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-258.json",
-      "pointCount": 778
+      "pointCount": 774
     },
     {
       "name": "261",
@@ -1728,7 +1728,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-303.json",
-      "pointCount": 1700
+      "pointCount": 1616
     },
     {
       "name": "303",
@@ -1945,14 +1945,14 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-350.json",
-      "pointCount": 2091
+      "pointCount": 1478
     },
     {
       "name": "351",
       "routeType": 700,
       "label": "Bus",
       "file": "line-351.json",
-      "pointCount": 2266
+      "pointCount": 1653
     },
     {
       "name": "352",
@@ -2015,14 +2015,14 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-360.json",
-      "pointCount": 2066
+      "pointCount": 1457
     },
     {
       "name": "361",
       "routeType": 700,
       "label": "Bus",
       "file": "line-361-t700.json",
-      "pointCount": 1992
+      "pointCount": 1908
     },
     {
       "name": "362",
@@ -2141,14 +2141,14 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-400.json",
-      "pointCount": 1347
+      "pointCount": 1315
     },
     {
       "name": "401",
       "routeType": 700,
       "label": "Bus",
       "file": "line-401.json",
-      "pointCount": 1146
+      "pointCount": 1069
     },
     {
       "name": "401",
@@ -2169,7 +2169,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-402.json",
-      "pointCount": 885
+      "pointCount": 844
     },
     {
       "name": "402",
@@ -2386,7 +2386,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-502.json",
-      "pointCount": 1576
+      "pointCount": 1589
     },
     {
       "name": "502",
@@ -2484,7 +2484,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-514.json",
-      "pointCount": 1273
+      "pointCount": 1202
     },
     {
       "name": "514",
@@ -2673,7 +2673,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-543.json",
-      "pointCount": 732
+      "pointCount": 721
     },
     {
       "name": "545",
@@ -2715,7 +2715,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-560.json",
-      "pointCount": 738
+      "pointCount": 727
     },
     {
       "name": "561",
@@ -2743,7 +2743,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-581.json",
-      "pointCount": 646
+      "pointCount": 727
     },
     {
       "name": "582",
@@ -2757,7 +2757,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-583.json",
-      "pointCount": 1316
+      "pointCount": 1314
     },
     {
       "name": "584",
@@ -2785,7 +2785,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-588.json",
-      "pointCount": 1143
+      "pointCount": 1130
     },
     {
       "name": "600",
@@ -2834,7 +2834,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-613.json",
-      "pointCount": 1279
+      "pointCount": 1282
     },
     {
       "name": "614",
@@ -2897,7 +2897,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-640.json",
-      "pointCount": 1721
+      "pointCount": 1713
     },
     {
       "name": "641",
@@ -2953,7 +2953,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-679.json",
-      "pointCount": 2482
+      "pointCount": 2475
     },
     {
       "name": "680",
@@ -3030,7 +3030,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-720.json",
-      "pointCount": 1015
+      "pointCount": 1002
     },
     {
       "name": "721",
@@ -3072,14 +3072,14 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-733.json",
-      "pointCount": 1027
+      "pointCount": 1028
     },
     {
       "name": "734",
       "routeType": 700,
       "label": "Bus",
       "file": "line-734.json",
-      "pointCount": 761
+      "pointCount": 767
     },
     {
       "name": "735",
@@ -3093,7 +3093,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-737.json",
-      "pointCount": 1578
+      "pointCount": 1571
     },
     {
       "name": "738",
@@ -3135,7 +3135,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-742.json",
-      "pointCount": 917
+      "pointCount": 881
     },
     {
       "name": "743",
@@ -3149,14 +3149,14 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-744.json",
-      "pointCount": 1383
+      "pointCount": 1363
     },
     {
       "name": "745",
       "routeType": 700,
       "label": "Bus",
       "file": "line-745.json",
-      "pointCount": 1255
+      "pointCount": 1245
     },
     {
       "name": "746",
@@ -3219,14 +3219,14 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-757.json",
-      "pointCount": 284
+      "pointCount": 279
     },
     {
       "name": "758",
       "routeType": 700,
       "label": "Bus",
       "file": "line-758.json",
-      "pointCount": 842
+      "pointCount": 839
     },
     {
       "name": "759",
@@ -3394,14 +3394,14 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-840.json",
-      "pointCount": 1405
+      "pointCount": 1404
     },
     {
       "name": "841",
       "routeType": 700,
       "label": "Bus",
       "file": "line-841.json",
-      "pointCount": 1770
+      "pointCount": 1744
     },
     {
       "name": "845",
@@ -3527,7 +3527,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-870.json",
-      "pointCount": 3978
+      "pointCount": 3937
     },
     {
       "name": "871",
@@ -3541,14 +3541,14 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-872.json",
-      "pointCount": 1108
+      "pointCount": 1092
     },
     {
       "name": "874",
       "routeType": 700,
       "label": "Bus",
       "file": "line-874.json",
-      "pointCount": 473
+      "pointCount": 447
     },
     {
       "name": "875",
@@ -3562,7 +3562,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-876.json",
-      "pointCount": 1044
+      "pointCount": 1003
     },
     {
       "name": "877",
@@ -3576,14 +3576,14 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-878.json",
-      "pointCount": 493
+      "pointCount": 433
     },
     {
       "name": "882",
       "routeType": 700,
       "label": "Bus",
       "file": "line-882.json",
-      "pointCount": 1382
+      "pointCount": 1348
     },
     {
       "name": "883",
@@ -3597,7 +3597,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-884.json",
-      "pointCount": 661
+      "pointCount": 657
     },
     {
       "name": "891",
@@ -3975,7 +3975,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-943.json",
-      "pointCount": 492
+      "pointCount": 516
     },
     {
       "name": "943",
@@ -3989,7 +3989,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-944.json",
-      "pointCount": 890
+      "pointCount": 607
     },
     {
       "name": "944",
@@ -4017,7 +4017,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-946.json",
-      "pointCount": 424
+      "pointCount": 371
     },
     {
       "name": "946",
@@ -4031,7 +4031,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-947.json",
-      "pointCount": 750
+      "pointCount": 550
     },
     {
       "name": "947",
@@ -4052,7 +4052,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-948.json",
-      "pointCount": 1328
+      "pointCount": 974
     },
     {
       "name": "948",
@@ -4073,7 +4073,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-949.json",
-      "pointCount": 661
+      "pointCount": 657
     },
     {
       "name": "949",
@@ -4087,14 +4087,14 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-950.json",
-      "pointCount": 402
+      "pointCount": 381
     },
     {
       "name": "951",
       "routeType": 700,
       "label": "Bus",
       "file": "line-951.json",
-      "pointCount": 1182
+      "pointCount": 1100
     },
     {
       "name": "951",
@@ -4108,7 +4108,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-952.json",
-      "pointCount": 537
+      "pointCount": 527
     },
     {
       "name": "952",
@@ -4339,7 +4339,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-BUSS.json",
-      "pointCount": 697
+      "pointCount": 1026
     },
     {
       "name": "BUSS",
@@ -4423,7 +4423,7 @@
       "routeType": 700,
       "label": "Bus",
       "file": "line-X3.json",
-      "pointCount": 2854
+      "pointCount": 3018
     },
     {
       "name": "X4",
@@ -4486,7 +4486,7 @@
       "routeType": 900,
       "label": "Tram",
       "file": "line-2.json",
-      "pointCount": 577
+      "pointCount": 601
     },
     {
       "name": "3",
@@ -4500,49 +4500,49 @@
       "routeType": 900,
       "label": "Tram",
       "file": "line-4.json",
-      "pointCount": 730
+      "pointCount": 761
     },
     {
       "name": "5",
       "routeType": 900,
       "label": "Tram",
       "file": "line-5.json",
-      "pointCount": 500
+      "pointCount": 565
     },
     {
       "name": "6",
       "routeType": 900,
       "label": "Tram",
       "file": "line-6.json",
-      "pointCount": 1067
+      "pointCount": 1065
     },
     {
       "name": "7",
       "routeType": 900,
       "label": "Tram",
       "file": "line-7.json",
-      "pointCount": 932
+      "pointCount": 972
     },
     {
       "name": "8",
       "routeType": 900,
       "label": "Tram",
       "file": "line-8.json",
-      "pointCount": 828
+      "pointCount": 783
     },
     {
       "name": "9",
       "routeType": 900,
       "label": "Tram",
       "file": "line-9.json",
-      "pointCount": 766
+      "pointCount": 797
     },
     {
       "name": "9",
       "routeType": 900,
       "label": "Tram",
       "file": "line-9.json",
-      "pointCount": 725
+      "pointCount": 728
     },
     {
       "name": "10",
@@ -4556,14 +4556,14 @@
       "routeType": 900,
       "label": "Tram",
       "file": "line-11.json",
-      "pointCount": 871
+      "pointCount": 957
     },
     {
       "name": "12",
       "routeType": 900,
       "label": "Tram",
       "file": "line-12.json",
-      "pointCount": 323
+      "pointCount": 324
     },
     {
       "name": "13",
@@ -4577,7 +4577,7 @@
       "routeType": 900,
       "label": "Tram",
       "file": "line-X.json",
-      "pointCount": 413
+      "pointCount": 530
     },
     {
       "name": "281",
@@ -4591,7 +4591,7 @@
       "routeType": 1000,
       "label": "Boat",
       "file": "line-282.json",
-      "pointCount": 146
+      "pointCount": 156
     },
     {
       "name": "283",
